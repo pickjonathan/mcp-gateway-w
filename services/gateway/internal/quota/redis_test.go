@@ -26,7 +26,11 @@ func TestRedisLimiter_FailOpen(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{Addr: "127.0.0.1:1"}) // nothing listening
 	defer rdb.Close()
 	l := NewRedisLimiter(rdb, 1, time.Minute)
-	if !l.Allow("k") || !l.Allow("k") {
+	// Two calls against a limit of 1: with Redis down it must allow both
+	// (fail open). Separate calls so the two side-effecting checks are distinct.
+	first := l.Allow("k")
+	second := l.Allow("k")
+	if !first || !second {
 		t.Fatal("limiter must fail open when Redis is unreachable")
 	}
 }
