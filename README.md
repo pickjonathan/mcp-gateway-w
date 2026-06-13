@@ -50,11 +50,18 @@ These run your local code against the stack with the right dev env baked in
 ### Connect an MCP client
 
 Add `127.0.0.1 acme.mcp.example.com` to `/etc/hosts`, then point a client at
-**`http://acme.mcp.example.com:8080/mcp`** (Transport: *Streamable HTTP*). For the
-local HTTP endpoint, authenticate with a **Bearer token** (the OAuth *flow*
-validates against the canonical `https://{org}.{base}/mcp`, which only matches
-behind a TLS edge). Full walkthrough + per-user RBAC validation:
-[MCP Clients & RBAC](docs/mcp-inspector-rbac.md).
+**`http://acme.mcp.example.com:8080/mcp`** (Transport: *Streamable HTTP*).
+Authenticate with **OAuth** or a **Bearer token**:
+
+- **OAuth (MCP Inspector):** in the auth settings set the **Client ID to `mcp-client`**
+  so it uses the pre-registered PKCE client instead of Dynamic Client Registration
+  (which Keycloak blocks). The gateway advertises the matching local resource via
+  `MCP_RESOURCE_TEMPLATE` (baked into `make run-gateway`), so the RFC 9728
+  resource-identifier check passes. Log in as `alice`/`alice`.
+- **Bearer token:** mint one with the snippet in the doc and paste it as
+  `Authorization: Bearer …`.
+
+Full walkthrough + per-user RBAC validation: [MCP Clients & RBAC](docs/mcp-inspector-rbac.md).
 
 ### How the pieces fit (dev notes)
 

@@ -58,7 +58,7 @@ func setupAdminAPI(t *testing.T) (base, adminTok, userTok string, sink *recordin
 		AdminAudience:          "https://api.mcp.example.com",
 		ShutdownTimeout:        time.Second,
 	}
-	validator := authz.NewJWTValidator(cfg.BaseDomain, cfg.KeycloakIssuerTemplate, authz.NewJWKSKeySource())
+	validator := authz.NewJWTValidator(cfg.BaseDomain, cfg.KeycloakIssuerTemplate, cfg.ResourceTemplate, authz.NewJWKSKeySource())
 	sink = &recordingSink{}
 	sec = secrets.NewMemStore()
 	api := NewAPI(cfg, zerolog.Nop(), NewMemStore(), sink, sec, audit.NewMemLogger(), validator)
@@ -213,7 +213,7 @@ func TestAdmin_CORS(t *testing.T) {
 		ShutdownTimeout:        time.Second,
 		ConsoleOrigins:         "https://acme.mcp.example.com",
 	}
-	validator := authz.NewJWTValidator(cfg.BaseDomain, cfg.KeycloakIssuerTemplate, authz.NewJWKSKeySource())
+	validator := authz.NewJWTValidator(cfg.BaseDomain, cfg.KeycloakIssuerTemplate, cfg.ResourceTemplate, authz.NewJWKSKeySource())
 	api := NewAPI(cfg, zerolog.Nop(), NewMemStore(), &recordingSink{}, secrets.NewMemStore(), audit.NewMemLogger(), validator)
 	srv := httptest.NewServer(api.e)
 	defer srv.Close()

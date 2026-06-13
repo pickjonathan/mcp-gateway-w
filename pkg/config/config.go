@@ -37,6 +37,13 @@ type Config struct {
 	// AdminAudience is the expected token audience for the control-plane admin API.
 	AdminAudience string
 
+	// ResourceTemplate, if set, is a fmt template (taking the org slug) for the
+	// per-org MCP resource URL — the value advertised in RFC 9728 metadata and
+	// required as the token audience. Empty uses the canonical
+	// https://{org}.{baseDomain}/mcp; set e.g. "http://%s.mcp.example.com:8080/mcp"
+	// for local (non-TLS, ported) access so the OAuth resource identifiers match.
+	ResourceTemplate string
+
 	// SandboxRuntime selects the untrusted-execution backend: gvisor | kata | runc | exec (dev).
 	SandboxRuntime string
 
@@ -105,6 +112,7 @@ func load() *Config {
 		VaultToken:             getEnv("MCP_VAULT_TOKEN", ""),
 		KeycloakIssuerTemplate: getEnv("MCP_KEYCLOAK_ISSUER_TEMPLATE", "https://auth.mcp.example.com/realms/%s"),
 		AdminAudience:          getEnv("MCP_ADMIN_AUDIENCE", "https://api.mcp.example.com"),
+		ResourceTemplate:       getEnv("MCP_RESOURCE_TEMPLATE", ""),
 		SandboxRuntime:         getEnv("MCP_SANDBOX_RUNTIME", "gvisor"),
 		SandboxImage:           getEnv("MCP_SANDBOX_IMAGE", "acme/mcp-sandbox:dev"),
 		RateOrgPerMin:          getInt("MCP_RATE_ORG_PER_MIN", 0),

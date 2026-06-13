@@ -27,7 +27,11 @@ COMPOSE="$SCRIPT_DIR/compose.yaml"
 : "${CONSOLE_ORIGIN:=http://localhost:5173}"
 : "${ADMIN_AUDIENCE:=https://api.mcp.example.com}"
 : "${MCP_CLIENT_ID:=mcp-client}"           # client for MCP clients hitting the gateway /mcp
-: "${BASE_DOMAIN:=mcp.example.com}"         # gateway MCP_BASE_DOMAIN → resource https://{realm}.{base}/mcp
+: "${BASE_DOMAIN:=mcp.example.com}"         # gateway MCP_BASE_DOMAIN
+# mcp-client token audience = the gateway's MCP resource URL. Must match the
+# gateway's MCP_RESOURCE_TEMPLATE. Dev default is the local http://…:8080 form so
+# the MCP Inspector's OAuth flow (RFC 9728 resource match) works without TLS.
+: "${MCP_RESOURCE:=http://$REALM.$BASE_DOMAIN:8080/mcp}"
 : "${ADMIN_USER:=admin}"
 : "${ADMIN_PW:=admin}"
 : "${ACCESS_TTL:=900}"      # access-token lifespan (seconds) — 15m
@@ -41,7 +45,7 @@ echo "Seeding Keycloak (realm=$REALM, client=$CLIENT_ID) — DEV ONLY…"
 docker compose -f "$COMPOSE" exec -T \
   -e REALM="$REALM" -e CLIENT_ID="$CLIENT_ID" -e CONSOLE_ORIGIN="$CONSOLE_ORIGIN" \
   -e ADMIN_AUDIENCE="$ADMIN_AUDIENCE" -e ADMIN_USER="$ADMIN_USER" -e ADMIN_PW="$ADMIN_PW" \
-  -e MCP_CLIENT_ID="$MCP_CLIENT_ID" -e BASE_DOMAIN="$BASE_DOMAIN" \
+  -e MCP_CLIENT_ID="$MCP_CLIENT_ID" -e BASE_DOMAIN="$BASE_DOMAIN" -e MCP_RESOURCE="$MCP_RESOURCE" \
   -e ACCESS_TTL="$ACCESS_TTL" -e SSO_IDLE="$SSO_IDLE" -e SSO_MAX="$SSO_MAX" \
   -e KC_ADMIN="$KC_ADMIN" -e KC_ADMIN_PW="$KC_ADMIN_PW" \
   keycloak bash -s <<'KCADM'
@@ -118,8 +122,8 @@ echo "  mappers: ok"
 # --- Public MCP client (for MCP clients — Inspector, mcp-remote, etc. — that
 #     connect to the gateway /mcp). The gateway requires the token audience to
 #     equal the org's MCP resource URL; an audience mapper supplies it. Direct
-#     grants are enabled for dev so a token can be minted from a script/curl. ---
-MCP_RESOURCE="https://$REALM.$BASE_DOMAIN/mcp"
+#     grants are enabled for dev so a token can be minted from a script/curl.
+#     MCP_RESOURCE (the audience) is provided by the host env. ---
 MCID=$($K get clients -r "$REALM" -q "clientId=$MCP_CLIENT_ID" --fields id --format csv --noquotes 2>/dev/null | tr -d '\r')
 if [ -z "$MCID" ]; then
   $K create clients -r "$REALM" \

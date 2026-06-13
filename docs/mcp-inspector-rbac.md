@@ -79,10 +79,19 @@ Open the printed URL (it includes a one-time `MCP_PROXY_AUTH_TOKEN`), then set:
 2. **URL** → `http://acme.mcp.example.com:8080/mcp`
 3. **Authentication** — either:
    - paste a token so the Inspector sends `Authorization: Bearer <token>`, **or**
-   - use the built-in **OAuth** flow — the Inspector reads the gateway's
-     protected-resource metadata, redirects you to the `acme` realm, you log in
-     (e.g. `alice`/`alice`), and it captures the token via PKCE.
+   - use the built-in **OAuth** flow. **Set the Client ID to `mcp-client`** in the
+     OAuth settings so the Inspector uses the pre-registered PKCE client instead of
+     Dynamic Client Registration (Keycloak's policy blocks DCR, and a DCR client
+     wouldn't carry the required audience). The Inspector reads the gateway's
+     metadata, redirects you to the `acme` realm to log in (`alice`/`alice`), and
+     captures the token via PKCE.
 4. **Connect** → **List Tools**.
+
+> **Why the Client ID matters.** The gateway requires the token audience to equal
+> the MCP resource it advertises. Locally that's `http://acme.mcp.example.com:8080/mcp`
+> (set via `MCP_RESOURCE_TEMPLATE`; the `mcp-client` audience mapper matches). A
+> dynamically-registered client gets neither that mapper nor allowed scopes, so it
+> fails — use `mcp-client`.
 
 ## Validate per-user tool access (RBAC)
 

@@ -118,7 +118,7 @@ func (s *Server) routes() {
 	// RFC 9728 discovery for the per-org MCP resource (FR-024).
 	s.e.GET("/.well-known/oauth-protected-resource", auth.ProtectedResourceMetadataHandler(s.cfg))
 
-	validator := authz.NewJWTValidator(s.cfg.BaseDomain, s.cfg.KeycloakIssuerTemplate, authz.NewJWKSKeySource())
+	validator := authz.NewJWTValidator(s.cfg.BaseDomain, s.cfg.KeycloakIssuerTemplate, s.cfg.ResourceTemplate, authz.NewJWKSKeySource())
 	g := s.e.Group("/mcp")
 	g.Use(auth.RequireAuth(s.cfg, validator, s.recordAuthDenied))
 	g.POST("", s.handleMCP)

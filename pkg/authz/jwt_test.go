@@ -34,7 +34,7 @@ func mint(t *testing.T, key *rsa.PrivateKey, iss, aud, sub string, exp time.Time
 
 func newValidator(key *rsa.PrivateKey) *JWTValidator {
 	ks := StaticKeySource{Keys: map[string]crypto.PublicKey{"test": &key.PublicKey}}
-	return NewJWTValidator("mcp.example.com", "https://auth.mcp.example.com/realms/%s", ks)
+	return NewJWTValidator("mcp.example.com", "https://auth.mcp.example.com/realms/%s", "", ks)
 }
 
 const (
