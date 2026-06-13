@@ -1,0 +1,56 @@
+# Prometheus alerting rules for the MCP runtime (T088). Loaded via rule_files in
+# prometheus.yml. Thresholds are dev-oriented; tune per environment + SLOs.
+groups:
+  - name: mcp-runtime
+    rules:
+      - alert: GatewayTargetDown
+        expr: up{job="gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Gateway scrape target down"
+          description: "Prometheus cannot scrape gateway {{ $labels.instance }} for 1m."
+
+      - alert: ControlPlaneTargetDown
+        expr: up{job="control-plane"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Control-plane scrape target down"
+          description: "Prometheus cannot scrape control-plane {{ $labels.instance }} for 1m."
+
+      - alert: HighServerErrorRate
+        expr: |
+          sum(rate(mcp_requests_total{code=~"5.."}[5m]))
+            / clamp_min(sum(rate(mcp_requests_total[5m])), 1) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elevated 5xx error rate"
+          description: "More than 5% of responses are 5xx over 10m."
+
+      # Isolation/authorization denials: sustained 401/403 can indicate misconfig,
+      # credential probing, or cross-tenant access attempts (HC-1 signal).
+      - alert: HighAuthDenialRate
+        expr: sum(rate(mcp_requests_total{code=~"401|403"}[5m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elevated auth/isolation denial rate"
+          description: "Sustained 401/403 responses (>5/s over 10m) — possible probing or cross-tenant access attempt."
+
+      # tools/call failures include downstream errors and quota rate-limiting.
+      - alert: HighToolCallErrorRate
+        expr: |
+          sum(rate(mcp_tool_calls_total{outcome="error"}[5m]))
+            / clamp_min(sum(rate(mcp_tool_calls_total[5m])), 1) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elevated tool-call error/quota rate"
+          description: "More than 20% of tools/call dispatches are failing (downstream errors or rate limiting) over 10m."

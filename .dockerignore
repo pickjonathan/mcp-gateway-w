@@ -1,0 +1,10 @@
+.git
+.github
+.specify
+specs
+*.md
+bin
+deploy/dev
+.env
+.env.*
+.DS_Store

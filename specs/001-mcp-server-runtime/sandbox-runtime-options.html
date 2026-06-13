@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sandbox Runtime &amp; Isolation Architecture Options — Multi-Tenant MCP Runtime</title>
+<style>
+  :root{
+    --ok:#15803d; --ok-bg:#dcfce7; --warn:#92660a; --warn-bg:#fef3c7;
+    --bad:#b91c1c; --bad-bg:#fee2e2; --ink:#1f2933; --muted:#6b7280;
+    --line:#e5e7eb; --accent:#4338ca; --accent-bg:#eef2ff; --code:#0f172a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       color:var(--ink);background:#f8fafc;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1140px;margin:0 auto;padding:32px 20px 80px}
+  h1{font-size:28px;line-height:1.25;margin:0 0 6px}
+  h2{font-size:21px;margin:40px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+  h3{font-size:17px;margin:26px 0 8px}
+  .sub{color:var(--muted);margin:0 0 18px}
+  .note{background:var(--accent-bg);border:1px solid #c7d2fe;border-radius:10px;padding:14px 16px;margin:18px 0}
+  .note b{color:var(--accent)}
+  p{margin:8px 0}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0;font-size:14px;color:var(--muted)}
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:720px}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  thead th{background:#f1f5f9;position:sticky;top:0;font-size:12.5px;letter-spacing:.02em;text-transform:uppercase;color:#475569}
+  tbody tr:last-child td{border-bottom:none}
+  td.arch{font-weight:600;white-space:nowrap}
+  td.tradeoff{color:#374151;min-width:230px}
+  .cell{display:flex;gap:6px;align-items:flex-start}
+  .b{flex:0 0 auto;font-weight:700}
+  .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+  td.ok{background:var(--ok-bg)} td.warn{background:var(--warn-bg)} td.bad{background:var(--bad-bg)}
+  .q{font-size:12.5px;color:#374151}
+  pre{background:var(--code);color:#e2e8f0;padding:14px 16px;border-radius:10px;overflow-x:auto;
+      font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;margin-top:8px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .card h3{margin-top:0}
+  .tag{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;margin-left:6px;vertical-align:middle}
+  .tag.prod{background:var(--ok-bg);color:var(--ok)} .tag.dev{background:var(--accent-bg);color:var(--accent)}
+  .tag.no{background:var(--bad-bg);color:var(--bad)}
+  .use{font-size:13.5px;color:var(--muted);margin-top:8px}
+  .rec{background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:16px 18px;margin-top:10px}
+  code{background:#eef2f7;padding:1px 5px;border-radius:5px;font:13px ui-monospace,Menlo,monospace}
+  footer{margin-top:40px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Sandbox Runtime &amp; Isolation Architecture Options</h1>
+  <p class="sub">Multi-Tenant MCP Server Runtime · 2026-06-13 · companion to <code>research.md</code> R1/R2</p>
+
+  <div class="note">
+    <b>Two axes, kept separate:</b>
+    <ol style="margin:6px 0 0">
+      <li><b>Isolation architecture</b> (plain container / gVisor / microVM / serverless) — what the 7 criteria actually differ on, at production scale.</li>
+      <li><b>Where you run it</b> (Docker Desktop / Linux VM+KVM / minikube / remote) — affects local setup &amp; fidelity, not the production scoring.</li>
+    </ol>
+  </div>
+
+  <div class="legend">
+    <span><b class="ok">✅</b> strong</span>
+    <span><b class="warn">⚠️</b> moderate / caveat</span>
+    <span><b class="bad">❌</b> weak</span>
+    <span>· Criteria 1–2 scored against “can a malicious MCP server break out?” (data-plane RBAC/tenancy is identical across options).</span>
+  </div>
+
+  <h2>1. Isolation architectures vs the 7 criteria</h2>
+  <div class="tablewrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Architecture</th><th>Isolation tradeoff</th>
+        <th>1· Org isolation</th><th>2· User isolation</th><th>3· Frictionless</th>
+        <th>4· Security (any MCP)</th><th>5· Scalability</th><th>6· Performance</th><th>7· Cost</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="arch">Plain containers</td>
+        <td class="tradeoff">Shared host kernel — one escape breaks every tenant; maximum density.</td>
+        <td class="bad"><span class="cell"><span class="b">❌</span><span class="q">escape → cross-org</span></span></td>
+        <td class="bad"><span class="cell"><span class="b">❌</span><span class="q">escape → cross-user</span></span></td>
+        <td class="ok"><span class="cell"><span class="b">✅</span><span class="q">instant start</span></span></td>
+        <td class="bad"><span class="cell"><span class="b">❌</span><span class="q">unsafe for untrusted</span></span></td>
+        <td class="ok"><span class="cell"><span class="b">✅</span><span class="q">highest density</span></span></td>
+        <td class="ok"><span class="cell"><span class="b">✅</span><span class="q">near-native</span></span></td>
+        <td class="ok"><span class="cell"><span class="b">✅</span><span class="q">cheapest</span></span></td>
+      </tr>
+      <tr>
+        <td class="arch">gVisor (<code>runsc</code>)</td>
+        <td class="tradeoff">User-space kernel intercepts syscalls; small shared-kernel surface remains.</td>
+        <td class="warn"><span class="cell"><span class="b">⚠️</span><span class="q">strong, not absolute</span></span></td>
+        <td class="warn"><span class="cell"><span class="b">⚠️</span><span class="q">strong, not absolute</span></span></td>
+        <td class="ok"><span class="cell"><span class="b">✅</span><span class="q">fast start</span></span></td>
+        <td class="warn"><span class="cell"><span class="b">⚠️</span><span class="q">strong mitigation, not a VM</span></span></td>
+        <td class="ok"><span class="cell"><span class="b">✅</span><span class="q">lightweight, dense</span></span></td>
+        <td class="warn"><span class="cell"><span class="b">⚠️</span><span class="q">syscall/I-O overhead</span></span></td>
+        <td class="ok"><span class="cell"><span class="b">✅</span><span class="q">container-like</span></span></td>
+      </tr>
+      <tr>
+        <td class="arch">microVM — Firecracker / Kata <span class="tag prod">prod choice</span></td>
+        <td class="tradeoff">Per-workload <b>guest kernel</b> (hardware virt) — strongest; pays in density + cold-start.</td>
+        <td class="ok"><span class="cell"><span class="b">✅</span><span class="q">own kernel</span></span></td>
+        <td class="ok"><span class="cell"><span class="b">✅</span><span class="q">per-user VM when needed</span></span></td>
+        <td class="ok"><span class="cell"><span class="b">✅</span><span class="q">slight first-launch delay</span></span></td>
+        <td class="ok"><span class="cell"><span class="b">✅</span><span class="q">best for untrusted code</span></span></td>
+        <td class="warn"><span class="cell"><span class="b">⚠️</span><span class="q">lower density; warm pools</span></span></td>
+        <td class="warn"><span class="cell"><span class="b">⚠️</span><span class="q">~125 ms boot; warm fast</span></span></td>
+        <td class="warn"><span class="cell"><span class="b">⚠️</span><span class="q">higher host overhead</span></span></td>
+      </tr>
+      <tr>
+        <td class="arch">Serverless containers <span class="q">(Fargate / Cloud Run g2 / Fly)</span></td>
+        <td class="tradeoff">VM-grade on most platforms (Fargate &amp; Fly = Firecracker); you inherit the platform boundary — least control.</td>
+        <td class="ok"><span class="cell"><span class="b">✅</span><span class="q">VM-backed</span></span></td>
+        <td class="ok"><span class="cell"><span class="b">✅</span><span class="q">per-task VM</span></span></td>
+        <td class="ok"><span class="cell"><span class="b">✅</span><span class="q">fully managed</span></span></td>
+        <td class="ok"><span class="cell"><span class="b">✅</span><span class="q">platform microVM</span></span></td>
+        <td class="ok"><span class="cell"><span class="b">✅</span><span class="q">auto-scale / to-zero</span></span></td>
+        <td class="warn"><span class="cell"><span class="b">⚠️</span><span class="q">cold starts; affinity</span></span></td>
+        <td class="warn"><span class="cell"><span class="b">⚠️</span><span class="q">pay-per-use premium</span></span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <p><b>Reading it:</b> density/cost/perf improve as you move <i>up</i>; isolation for untrusted code improves as you move <i>down</i>. The spec ranks <b>security (HC-3) hard</b> and <b>cost/perf (SG-3/4) soft</b> — which is why the plan picks <b>microVM</b> for production and keeps <b>gVisor</b> as a cheaper defense-in-depth / dev layer.</p>
+
+  <h2>2. Where you run it (local dev → production)</h2>
+  <div class="note" style="background:#ecfeff;border-color:#a5f3fc">
+    💡 Your hardware (<b>Apple M4 Max, macOS 26</b>) supports <b>nested virtualization</b>, so unlike M1/M2 Macs the real Firecracker/Kata path <i>is</i> runnable locally inside a KVM-enabled Linux VM — not only via gVisor.
+  </div>
+  <div class="tablewrap">
+  <table>
+    <thead>
+      <tr><th>Run environment</th><th>Runs which architecture</th><th>Real microVM (KVM)?</th><th>Setup</th><th>Local fidelity</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="arch">Docker Desktop + gVisor</td><td>gVisor</td><td class="bad"><b>❌</b> no KVM</td><td>Low</td><td>Medium</td><td>Fastest to code/test; honest (gVisor is a real layer). arm64 OK, minor quirks.</td></tr>
+      <tr><td class="arch">Docker Desktop, plain container</td><td>plain container</td><td class="bad"><b>❌</b></td><td>Lowest</td><td>Low</td><td>Wiring/integration tests only — <b>not</b> a boundary for untrusted code.</td></tr>
+      <tr><td class="arch">Linux VM + KVM + Kata/Firecracker</td><td>microVM</td><td class="ok"><b>✅</b> yes (M4 nested virt)</td><td>High</td><td>High</td><td>True prod boundary locally; fiddly nested-virt + Kata setup; VM-in-VM overhead.</td></tr>
+      <tr><td class="arch">minikube/k3s in KVM VM + Kata <code>RuntimeClass</code></td><td>microVM (k8s)</td><td class="ok"><b>✅</b></td><td>Highest</td><td>Highest</td><td>Mirrors production topology (k8s + RuntimeClass + microVM).</td></tr>
+      <tr><td class="arch">minikube (docker driver) + gVisor addon</td><td>gVisor (k8s)</td><td class="bad"><b>❌</b></td><td>Medium</td><td>Medium</td><td>Exercises k8s manifests + RuntimeClass wiring without KVM; arm64 addon caveat.</td></tr>
+      <tr><td class="arch">Remote KVM host / cloud (<code>.metal</code>)</td><td>microVM</td><td class="ok"><b>✅</b> remote</td><td>Medium</td><td>High</td><td>Offloads KVM to a real Linux box — great for CI &amp; fidelity; remote loop + cost.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>3. Architecture of each solution</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>A. Plain containers <span class="tag no">dev-only</span></h3>
+      <p>OCI container with namespaces, cgroups, seccomp, dropped caps. All tenants share the <b>one host kernel</b>; isolation rests entirely on kernel correctness.</p>
+      <pre>┌──────────┐ ┌──────────┐  per-tenant
+│ MCP A    │ │ MCP B    │  containers
+├──────────┴─┴──────────┤
+│   SHARED HOST KERNEL   │ ◄ one escape = all tenants
+└────────────────────────┘</pre>
+      <p class="use">Use: dev wiring only. Reject for untrusted code (HC-3).</p>
+    </div>
+    <div class="card">
+      <h3>B. gVisor (<code>runsc</code>) <span class="tag dev">dev backend</span></h3>
+      <p>Workload runs atop the <b>Sentry</b>, a user-space kernel that services syscalls, so it rarely touches the host kernel. Much smaller surface than plain containers, far lighter than a VM.</p>
+      <pre>┌──────────┐
+│  MCP svr │
+├──────────┤
+│  Sentry  │ ◄ user-space kernel
+├──────────┤
+│host kernel│ (filtered surface)
+└──────────┘</pre>
+      <p class="use">Use: default local/dev backend + defense-in-depth in prod.</p>
+    </div>
+    <div class="card">
+      <h3>C. microVM — Firecracker / Kata <span class="tag prod">production</span></h3>
+      <p>Each server runs in its own lightweight VM with a <b>dedicated guest kernel</b>, started by a minimal VMM on KVM (~125 ms boot). Orchestrated via Kata <code>RuntimeClass</code> on k8s; warm pools + scale-to-zero manage cold-start/cost.</p>
+      <pre>┌──────────┐ ┌──────────┐
+│ MCP svr  │ │ MCP svr  │
+│GUEST KRNL│ │GUEST KRNL│ ◄ own kernel
+├──────────┤ ├──────────┤
+│Firecrackr│ │Firecrackr│  (KVM)
+├──────────┴─┴──────────┤
+│       HOST KERNEL      │
+└────────────────────────┘</pre>
+      <p class="use">Use: production. Strongest practical isolation; cost/perf premium is the deliberate HC-3-over-SG-4 trade.</p>
+    </div>
+    <div class="card">
+      <h3>D. Serverless containers <span class="tag dev">build-vs-buy</span></h3>
+      <p>A managed platform runs each workload in its own isolation unit (Fargate &amp; Fly = Firecracker microVMs; Cloud Run gen2 = microVM). VM-grade isolation + auto-scaling without operating the substrate.</p>
+      <pre>┌──────────┐
+│  MCP svr │
+├──────────┤
+│ platform │ ◄ provider microVM
+│ isolation│
+└──────────┘ (you don't run host)</pre>
+      <p class="use">Use: least ops, less control/portability; cost &amp; cold-start vary by vendor.</p>
+    </div>
+  </div>
+
+  <h2>Recommendation</h2>
+  <div class="rec">
+    <p>Make the sandbox runtime <b>pluggable</b> (a <code>SandboxRuntime</code> interface) with swappable backends:</p>
+    <ul>
+      <li><b>Dev / local / CI → gVisor</b> (Docker Desktop, or minikube + gVisor addon). No KVM, fast loop, faithful to our defense-in-depth layer.</li>
+      <li><b>Production → microVM (Firecracker/Kata)</b> on KVM-capable nodes. The hard-constraint (HC-3) isolation boundary.</li>
+      <li><b>Fidelity check → real microVM path</b> in a KVM-enabled Linux VM on your M4 (nested virt) or a remote host; pass the adversarial suite (US4 / SC-002–003) there before any production claim.</li>
+    </ul>
+    <p style="margin-bottom:0">This satisfies HC-3 in production while keeping development fast and cheap — consistent with research <b>R1</b>.</p>
+  </div>
+
+  <footer>Generated for <code>specs/001-mcp-server-runtime</code> · open this file in any browser · source: <code>sandbox-runtime-options.md</code></footer>
+</div>
+</body>
+</html>
