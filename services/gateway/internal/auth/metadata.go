@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -28,7 +29,7 @@ func ProtectedResourceMetadataHandler(cfg *config.Config) echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusBadRequest, "unknown organization host")
 		}
 		return c.JSON(http.StatusOK, metadataDoc{
-			Resource:             fmt.Sprintf("https://%s.%s/mcp", org, cfg.BaseDomain),
+			Resource:             authz.MCPResource(org, cfg.BaseDomain, cfg.ResourceTemplate),
 			AuthorizationServers: []string{fmt.Sprintf(cfg.KeycloakIssuerTemplate, org)},
 			ScopesSupported:      []string{"mcp:tools", "mcp:resources", "mcp:prompts"},
 			BearerMethods:        []string{"header"},
@@ -37,11 +38,11 @@ func ProtectedResourceMetadataHandler(cfg *config.Config) echo.HandlerFunc {
 }
 
 // challenge builds the RFC 9728 WWW-Authenticate header value pointing clients
-// at the resource-metadata document.
+// at the resource-metadata document (same scheme/host/port as the resource, so
+// the local http://…:8080 form works as well as the canonical https URL).
 func challenge(cfg *config.Config, host string) string {
 	org := authz.OrgFromHost(host, cfg.BaseDomain)
-	return fmt.Sprintf(
-		`Bearer resource_metadata="https://%s.%s/.well-known/oauth-protected-resource"`,
-		org, cfg.BaseDomain,
-	)
+	resource := authz.MCPResource(org, cfg.BaseDomain, cfg.ResourceTemplate)
+	base := strings.TrimSuffix(resource, "/mcp")
+	return fmt.Sprintf(`Bearer resource_metadata="%s/.well-known/oauth-protected-resource"`, base)
 }

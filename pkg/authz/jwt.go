@@ -16,15 +16,28 @@ type KeySource interface {
 // JWTValidator validates RS256 access tokens, enforcing issuer and audience
 // binding derived from the request host (one Keycloak realm per org).
 type JWTValidator struct {
-	baseDomain     string
-	issuerTemplate string // fmt template taking the org slug
-	keys           KeySource
+	baseDomain       string
+	issuerTemplate   string // fmt template taking the org slug
+	resourceTemplate string // optional fmt template (org) for the MCP resource/audience
+	keys             KeySource
 }
 
 // NewJWTValidator builds a validator. issuerTemplate takes the org slug, e.g.
-// "https://auth.mcp.example.com/realms/%s".
-func NewJWTValidator(baseDomain, issuerTemplate string, keys KeySource) *JWTValidator {
-	return &JWTValidator{baseDomain: baseDomain, issuerTemplate: issuerTemplate, keys: keys}
+// "https://auth.mcp.example.com/realms/%s". resourceTemplate (optional) overrides
+// the MCP resource/audience URL — see MCPResource.
+func NewJWTValidator(baseDomain, issuerTemplate, resourceTemplate string, keys KeySource) *JWTValidator {
+	return &JWTValidator{baseDomain: baseDomain, issuerTemplate: issuerTemplate, resourceTemplate: resourceTemplate, keys: keys}
+}
+
+// MCPResource returns the per-org MCP resource URL — the value advertised in
+// RFC 9728 metadata and required as the token audience. When template is
+// non-empty it is fmt-applied to the org; otherwise the canonical
+// https://{org}.{baseDomain}/mcp is used.
+func MCPResource(org, baseDomain, template string) string {
+	if template != "" {
+		return fmt.Sprintf(template, org)
+	}
+	return fmt.Sprintf("https://%s.%s/mcp", org, baseDomain)
 }
 
 type claims struct {
@@ -42,7 +55,7 @@ func (v *JWTValidator) Validate(ctx context.Context, raw, host string) (*Princip
 	if org == "" {
 		return nil, ErrUnknownOrg
 	}
-	return v.verify(ctx, raw, org, fmt.Sprintf("https://%s.%s/mcp", org, v.baseDomain))
+	return v.verify(ctx, raw, org, MCPResource(org, v.baseDomain, v.resourceTemplate))
 }
 
 // ValidateForOrg verifies a token for an explicit org (path-based APIs) against

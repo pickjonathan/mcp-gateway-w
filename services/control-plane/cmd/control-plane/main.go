@@ -24,7 +24,7 @@ func main() {
 	}
 	log.Info().Str("base_domain", cfg.BaseDomain).Msg("starting mcp control-plane")
 
-	validator := authz.NewJWTValidator(cfg.BaseDomain, cfg.KeycloakIssuerTemplate, authz.NewJWKSKeySource())
+	validator := authz.NewJWTValidator(cfg.BaseDomain, cfg.KeycloakIssuerTemplate, cfg.ResourceTemplate, authz.NewJWKSKeySource())
 	bus := serverevents.NewRedisBus(cfg.RedisAddr)
 	var sec secrets.Store = secrets.NewMemStore()
 	if cfg.VaultAddr != "" {
