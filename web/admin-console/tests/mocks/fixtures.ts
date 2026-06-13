@@ -33,6 +33,4 @@ export const auditEvents = [
   { seq: 1, time: '2026-06-13T12:00:00Z', actor: 'admin', action: 'credentials.put', target: 'weather', metadata: { scope: 'org' } },
 ]
 
-export const auditChain = { status: 'verified' as const }
-
 export const quotas = { org_per_min: 600, user_per_min: 60 }

@@ -12,27 +12,53 @@ export class ApiError extends Error {
   }
 }
 
-let token: string | null = null
+/**
+ * Resolves the bearer for a request. `force: true` asks the provider to refresh
+ * (renew) the token rather than return a cached one — used on a 401 retry.
+ */
+export type TokenProvider = (opts?: { force?: boolean }) => Promise<string | null>
+
+let getToken: TokenProvider = async () => null
 let org = ''
 
-/** Set the org + bearer used by all requests (called by AuthProvider). */
-export function configureApi(opts: { token: string | null; org: string }): void {
-  token = opts.token
+/**
+ * Set the org + bearer source used by all requests (called by AuthProvider).
+ * Accepts either a static `token` (tests) or an async `getToken` provider that
+ * returns a *fresh* token per request (prod — so it can't go stale between the
+ * background renew timer firing and an actual API call).
+ */
+export function configureApi(opts: {
+  org: string
+  token?: string | null
+  getToken?: TokenProvider
+}): void {
   org = opts.org
+  if (opts.getToken) {
+    getToken = opts.getToken
+  } else {
+    const t = opts.token ?? null
+    getToken = async () => t
+  }
 }
 
-function headers(): Record<string, string> {
+async function headers(force?: boolean): Promise<Record<string, string>> {
   const h: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (token) h.Authorization = `Bearer ${token}`
+  const t = await getToken(force ? { force: true } : undefined)
+  if (t) h.Authorization = `Bearer ${t}`
   return h
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`/v1/orgs/${encodeURIComponent(org)}${path}`, {
-    method,
-    headers: headers(),
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
+  const url = `/v1/orgs/${encodeURIComponent(org)}${path}`
+  const payload = body === undefined ? undefined : JSON.stringify(body)
+  const send = async (force?: boolean) =>
+    fetch(url, { method, headers: await headers(force), body: payload })
+
+  let res = await send()
+  // A 401 means the bearer was rejected — almost always a just-expired token
+  // that the background renew hasn't replaced yet. Force a refresh and retry once.
+  if (res.status === 401) res = await send(true)
+
   if (res.status === 204) return undefined as T
   const text = await res.text()
   if (!res.ok) throw new ApiError(res.status, text || res.statusText)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSession } from '../auth/AuthProvider'
 import { Loading, ErrorState } from '../app/feedback/states'
@@ -7,8 +7,14 @@ export function Callback() {
   const { completeSignIn } = useSession()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
+  // The authorization code is single-use. React StrictMode (dev) invokes effects
+  // twice, which would replay the code exchange and trigger a spurious 400 from
+  // the token endpoint. Guard so the exchange runs exactly once per page load.
+  const started = useRef(false)
 
   useEffect(() => {
+    if (started.current) return
+    started.current = true
     completeSignIn()
       .then(() => navigate('/', { replace: true }))
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))

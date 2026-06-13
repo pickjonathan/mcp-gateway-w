@@ -24,3 +24,4 @@ coverage*
 # Tooling artifacts / stray binaries (not part of the project)
 .playwright-mcp/
 *.zip
+admin-console-*.png

@@ -34,7 +34,7 @@ Browser SPA (public client)                    Keycloak (realm = {org})         
 | DELETE | `/v1/orgs/{org}/servers/{id}/credentials` | clear org-shared secret | US3 |
 | PUT | `/v1/orgs/{org}/servers/{id}/credentials/me` | set caller's per-user secret | US3 |
 | DELETE | `/v1/orgs/{org}/servers/{id}/credentials/me` | clear caller's per-user secret | US3 |
-| GET | `/v1/orgs/{org}/audit` | audit events (newest-first) + chain status | US5 |
+| GET | `/v1/orgs/{org}/audit` | bare array of hash-chained audit records (newest-first); **no** chain-status field — `Verify()` is not routed | US5 |
 | GET | `/v1/orgs/{org}/quotas` *(new, read-only)* | configured per-org/per-user limits (display only) | US6 |
 | GET | metrics query API (Prometheus) *(read-only)* | request/denial/error rate trends | US6, Dashboard |
 

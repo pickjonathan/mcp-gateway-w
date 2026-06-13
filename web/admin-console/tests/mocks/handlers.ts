@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw'
-import { servers, auditEvents, auditChain, quotas } from './fixtures'
+import { servers, auditEvents, quotas } from './fixtures'
 
 // MSW handlers mocking the control-plane admin API the console consumes
 // (contracts/control-plane-consumed.md). Credential writes are 204, value never
@@ -25,7 +25,8 @@ export const handlers = [
   http.put('/v1/orgs/:org/servers/:id/credentials/me', () => new HttpResponse(null, { status: 204 })),
   http.delete('/v1/orgs/:org/servers/:id/credentials/me', () => new HttpResponse(null, { status: 204 })),
 
-  http.get('/v1/orgs/:org/audit', () => HttpResponse.json({ events: auditEvents, chain: auditChain })),
+  // The control-plane returns a bare array of hash-chained records (newest first).
+  http.get('/v1/orgs/:org/audit', () => HttpResponse.json(auditEvents)),
   http.get('/v1/orgs/:org/quotas', () => HttpResponse.json(quotas)),
 
   // Prometheus query API (via the /metrics-api proxy) — returns a constant rate.
