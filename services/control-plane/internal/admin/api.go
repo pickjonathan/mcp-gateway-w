@@ -32,6 +32,17 @@ func NewAPI(cfg *config.Config, log zerolog.Logger, store Store, sink Sink, sec 
 	e.HidePort = true
 	e.Use(middleware.Recover())
 
+	// CORS for the admin console SPA (T008). Only the configured origins may call
+	// the API from a browser; auth is still enforced per request (bearer + admin
+	// role + org audience). No authorization change — headers only.
+	if origins := splitCSV(cfg.ConsoleOrigins); len(origins) > 0 {
+		e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+			AllowOrigins: origins,
+			AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodDelete, http.MethodOptions},
+			AllowHeaders: []string{echo.HeaderAuthorization, echo.HeaderContentType},
+		}))
+	}
+
 	var tr *telemetry.Tracing
 	if t, err := telemetry.NewTracing(context.Background(), "mcp-control-plane", cfg.OTLPEndpoint); err != nil {
 		log.Error().Err(err).Msg("tracing init failed; continuing without tracing")
@@ -71,6 +82,17 @@ func NewAPI(cfg *config.Config, log zerolog.Logger, store Store, sink Sink, sec 
 	ag := e.Group("/v1/orgs/:org/audit")
 	ag.Use(requireAdmin(validator, cfg.AdminAudience))
 	ag.GET("", h.ListAudit)
+
+	// Read-only quotas (admin-only) — surfaces the configured limits for the admin
+	// console (T047). Display only; editing is out of scope (FR-017/FR-023).
+	qg := e.Group("/v1/orgs/:org/quotas")
+	qg.Use(requireAdmin(validator, cfg.AdminAudience))
+	qg.GET("", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]int{
+			"org_per_min":  cfg.RateOrgPerMin,
+			"user_per_min": cfg.RateUserPerMin,
+		})
+	})
 
 	return &API{e: e, cfg: cfg, log: log, metrics: m, tracing: tr}
 }
@@ -123,4 +145,15 @@ func bearer(h string) string {
 		return strings.TrimSpace(h[len(prefix):])
 	}
 	return ""
+}
+
+// splitCSV splits a comma-separated list, trimming blanks (e.g. CORS origins).
+func splitCSV(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

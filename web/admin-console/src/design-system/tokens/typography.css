@@ -1,0 +1,85 @@
+/* ============================================================
+   CARBON — TYPOGRAPHY TOKENS
+   IBM Plex families, weights, the Carbon type scale, and the
+   full set of named type styles as utility classes.
+   ============================================================ */
+
+:root {
+  /* ---------- Font families ---------- */
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-serif: 'IBM Plex Serif', Georgia, Times, serif;
+  --font-mono: 'IBM Plex Mono', Menlo, 'DejaVu Sans Mono', 'Courier New', monospace;
+  --font-condensed: 'IBM Plex Sans Condensed', 'Helvetica Neue', Arial, sans-serif;
+
+  /* ---------- Font weights ---------- */
+  --font-weight-light: 300;
+  --font-weight-regular: 400;
+  --font-weight-semibold: 600;
+
+  /* ---------- Type scale (px → the Carbon modular scale) ---------- */
+  --type-scale-01: 0.75rem;    /* 12px */
+  --type-scale-02: 0.875rem;   /* 14px */
+  --type-scale-03: 1rem;       /* 16px */
+  --type-scale-04: 1.125rem;   /* 18px */
+  --type-scale-05: 1.25rem;    /* 20px */
+  --type-scale-06: 1.5rem;     /* 24px */
+  --type-scale-07: 1.75rem;    /* 28px */
+  --type-scale-08: 2rem;       /* 32px */
+  --type-scale-09: 2.25rem;    /* 36px */
+  --type-scale-10: 2.625rem;   /* 42px */
+  --type-scale-11: 3rem;       /* 48px */
+  --type-scale-12: 3.375rem;   /* 54px */
+  --type-scale-13: 3.75rem;    /* 60px */
+  --type-scale-14: 4.25rem;    /* 68px */
+  --type-scale-15: 4.75rem;    /* 76px */
+  --type-scale-16: 5.25rem;    /* 84px */
+
+  /* ---------- Letter spacing ---------- */
+  --letter-spacing-01: 0.32px;
+  --letter-spacing-02: 0.16px;
+  --letter-spacing-condensed: -0.64px;
+}
+
+/* ============================================================
+   NAMED TYPE STYLES (Carbon v11)
+   Apply as classes. Every style sets family/size/weight/
+   line-height/letter-spacing exactly as the spec defines.
+   ============================================================ */
+
+/* — Utility / supporting — */
+.cds-type-code-01 { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 400; line-height: 1.33333; letter-spacing: 0.32px; }
+.cds-type-code-02 { font-family: var(--font-mono); font-size: 0.875rem; font-weight: 400; line-height: 1.42857; letter-spacing: 0.32px; }
+.cds-type-label-01 { font-family: var(--font-sans); font-size: 0.75rem; font-weight: 400; line-height: 1.33333; letter-spacing: 0.32px; }
+.cds-type-label-02 { font-family: var(--font-sans); font-size: 0.875rem; font-weight: 400; line-height: 1.28572; letter-spacing: 0.16px; }
+.cds-type-helper-01 { font-family: var(--font-sans); font-size: 0.75rem; font-weight: 400; line-height: 1.33333; letter-spacing: 0.32px; }
+.cds-type-helper-02 { font-family: var(--font-sans); font-size: 0.875rem; font-weight: 400; line-height: 1.28572; letter-spacing: 0.16px; }
+.cds-type-legal-01 { font-family: var(--font-sans); font-size: 0.75rem; font-weight: 400; line-height: 1.33333; letter-spacing: 0.32px; }
+
+/* — Body — */
+.cds-type-body-compact-01 { font-family: var(--font-sans); font-size: 0.875rem; font-weight: 400; line-height: 1.28572; letter-spacing: 0.16px; }
+.cds-type-body-compact-02 { font-family: var(--font-sans); font-size: 1rem; font-weight: 400; line-height: 1.375; letter-spacing: 0; }
+.cds-type-body-01 { font-family: var(--font-sans); font-size: 0.875rem; font-weight: 400; line-height: 1.42857; letter-spacing: 0.16px; }
+.cds-type-body-02 { font-family: var(--font-sans); font-size: 1rem; font-weight: 400; line-height: 1.5; letter-spacing: 0; }
+
+/* — Fixed headings — */
+.cds-type-heading-compact-01 { font-family: var(--font-sans); font-size: 0.875rem; font-weight: 600; line-height: 1.28572; letter-spacing: 0.16px; }
+.cds-type-heading-compact-02 { font-family: var(--font-sans); font-size: 1rem; font-weight: 600; line-height: 1.375; letter-spacing: 0; }
+.cds-type-heading-01 { font-family: var(--font-sans); font-size: 0.875rem; font-weight: 600; line-height: 1.42857; letter-spacing: 0.16px; }
+.cds-type-heading-02 { font-family: var(--font-sans); font-size: 1rem; font-weight: 600; line-height: 1.5; letter-spacing: 0; }
+.cds-type-heading-03 { font-family: var(--font-sans); font-size: 1.25rem; font-weight: 400; line-height: 1.4; letter-spacing: 0; }
+.cds-type-heading-04 { font-family: var(--font-sans); font-size: 1.75rem; font-weight: 400; line-height: 1.28572; letter-spacing: 0; }
+.cds-type-heading-05 { font-family: var(--font-sans); font-size: 2rem; font-weight: 400; line-height: 1.25; letter-spacing: 0; }
+.cds-type-heading-06 { font-family: var(--font-sans); font-size: 2.625rem; font-weight: 300; line-height: 1.199; letter-spacing: 0; }
+.cds-type-heading-07 { font-family: var(--font-sans); font-size: 3.375rem; font-weight: 300; line-height: 1.199; letter-spacing: 0; }
+
+/* — Fluid / expressive display — */
+.cds-type-fluid-heading-03 { font-family: var(--font-sans); font-size: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem); font-weight: 400; line-height: 1.4; }
+.cds-type-fluid-heading-05 { font-family: var(--font-sans); font-size: clamp(2rem, 1.4rem + 2.4vw, 3rem); font-weight: 300; line-height: 1.22; }
+.cds-type-display-01 { font-family: var(--font-sans); font-size: clamp(2.625rem, 1.6rem + 4vw, 3.75rem); font-weight: 300; line-height: 1.19; }
+.cds-type-display-02 { font-family: var(--font-sans); font-size: clamp(2.625rem, 1.6rem + 4vw, 3.75rem); font-weight: 600; line-height: 1.19; }
+.cds-type-display-03 { font-family: var(--font-sans); font-size: clamp(2.625rem, 1rem + 7vw, 5.25rem); font-weight: 300; line-height: 1.13; letter-spacing: -0.64px; }
+.cds-type-display-04 { font-family: var(--font-sans); font-size: clamp(2.625rem, 0.4rem + 9vw, 6.25rem); font-weight: 300; line-height: 1.11; letter-spacing: -0.96px; }
+
+/* — Quotation (serif) — */
+.cds-type-quotation-01 { font-family: var(--font-serif); font-size: clamp(1.25rem, 1.1rem + 0.6vw, 1.75rem); font-weight: 400; line-height: 1.3; }
+.cds-type-quotation-02 { font-family: var(--font-serif); font-size: clamp(2rem, 1.4rem + 2.4vw, 3.75rem); font-weight: 300; line-height: 1.2; }

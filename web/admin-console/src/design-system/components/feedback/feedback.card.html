@@ -1,0 +1,41 @@
+<!-- @dsCard group="Components" viewport="700x300" name="Feedback — notifications & progress" subtitle="Inline notifications and progress bars" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  body { margin: 0; padding: 24px; background: var(--background); font-family: var(--font-sans); }
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+  .bars { display: flex; flex-direction: column; gap: 18px; margin-top: 20px; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel">
+    const { InlineNotification, ProgressBar } = window.CarbonDesignSystem_666911;
+    function Demo() {
+      return (
+        <>
+          <div className="stack">
+            <InlineNotification kind="success" title="Deployed" subtitle="Your app is live in us-south." />
+            <InlineNotification kind="error" title="Build failed" subtitle="See the logs for details." />
+            <InlineNotification kind="warning" title="Quota at 90%" subtitle="Upgrade to avoid throttling." />
+            <InlineNotification kind="info" title="New region available" subtitle="jp-osa is now live." />
+          </div>
+          <div className="bars">
+            <ProgressBar label="Uploading model" value={64} helperText="64 of 100 MB" />
+            <ProgressBar label="Provisioning cluster" indeterminate />
+            <ProgressBar label="Deployment complete" value={100} status="success" />
+          </div>
+        </>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+/* ============================================================
+   CARBON — WEBFONTS
+   IBM Plex is IBM's open-source corporate typeface (the real
+   brand font, served from its open-source home on Google Fonts).
+   Families: IBM Plex Sans (UI), IBM Plex Mono (code), IBM Plex
+   Serif (expressive quotes). Weights: Light 300, Regular 400,
+   SemiBold 600.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;600&family=IBM+Plex+Sans+Condensed:wght@400;600&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Serif:wght@300;400;600&display=swap');

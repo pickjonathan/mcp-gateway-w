@@ -1,0 +1,124 @@
+<!-- @dsCard group="Cloud Console" viewport="1280x720" name="IBM Cloud Console" subtitle="UI-shell, dashboard, resource table and catalog" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloud Console — Carbon UI Kit</title>
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--background); color: var(--text-primary); font-family: var(--font-sans); }
+  #root { height: 100vh; }
+  .ux-ico-inv { filter: brightness(0) invert(1); }
+
+  /* ---- App layout ---- */
+  .ux-app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ---- Header (UI shell) ---- */
+  .ux-header { position: relative; z-index: 30; display: flex; align-items: center; height: 48px; background: var(--gray-100); color: #fff; border-bottom: 1px solid #393939; }
+  .ux-header__action { display: grid; place-items: center; width: 48px; height: 48px; background: transparent; border: none; cursor: pointer; }
+  .ux-header__action:hover { background: #2c2c2c; }
+  .ux-header__name { display: flex; align-items: center; padding: 0 16px; height: 100%; color: #fff; font-size: 14px; text-decoration: none; }
+  .ux-header__name b { font-weight: 600; }
+  .ux-header__nav { display: flex; height: 100%; }
+  .ux-header__navitem { display: flex; align-items: center; padding: 0 16px; color: #c6c6c6; font-size: 14px; text-decoration: none; border-bottom: 2px solid transparent; }
+  .ux-header__navitem:hover { color: #fff; background: #2c2c2c; text-decoration: none; }
+  .ux-header__navitem--active { color: #fff; border-bottom-color: var(--blue-60); }
+  .ux-header__spacer { flex: 1; }
+  .ux-header__tools { display: flex; height: 100%; }
+  .ux-header__avatar:hover { background: #2c2c2c; }
+
+  /* ---- Body split ---- */
+  .ux-body { display: flex; flex: 1; min-height: 0; }
+
+  /* ---- Side nav ---- */
+  .ux-sidenav { width: 256px; flex: none; background: var(--layer-02); border-right: 1px solid var(--border-subtle-01); overflow-y: auto; transition: width 110ms var(--easing-standard-productive), transform 110ms; }
+  .ux-sidenav__list { list-style: none; margin: 0; padding: 8px 0; }
+  .ux-sidenav__link { display: flex; align-items: center; gap: 12px; width: 100%; height: 40px; padding: 0 16px; background: transparent; border: none; cursor: pointer; font-family: var(--font-sans); font-size: 14px; color: var(--text-secondary); text-align: left; }
+  .ux-sidenav__link:hover { background: var(--layer-hover-01); color: var(--text-primary); }
+  .ux-sidenav__link.is-active { background: var(--layer-selected-01); color: var(--text-primary); font-weight: 600; box-shadow: inset 3px 0 0 var(--blue-60); }
+  .ux-sidenav__icon { opacity: .85; }
+  .ux-sidenav__divider { height: 1px; background: var(--border-subtle-01); margin: 8px 16px; }
+
+  /* ---- Main scroll ---- */
+  .ux-main { flex: 1; min-width: 0; overflow-y: auto; background: var(--background); }
+  .ux-view { max-width: 1056px; margin: 0 auto; padding: 32px 32px 64px; }
+
+  .ux-page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+  .ux-breadcrumb { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; letter-spacing: .32px; }
+  .ux-page-head h1 { margin: 0; color: var(--text-primary); }
+  .ux-section-title { margin: 40px 0 16px; color: var(--text-primary); }
+  .ux-notif-wrap { margin-bottom: 24px; }
+
+  /* ---- Metrics ---- */
+  .ux-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border-subtle-01); border: 1px solid var(--border-subtle-01); }
+  .ux-metric { background: var(--layer-02); padding: 16px 20px 20px; }
+  .ux-metric__label { font-size: 12px; color: var(--text-secondary); letter-spacing: .32px; margin-bottom: 8px; }
+  .ux-metric__value { font-family: var(--font-sans); font-size: 2.625rem; font-weight: 300; line-height: 1.1; color: var(--text-primary); }
+  .ux-metric__delta { font-size: 12px; margin-top: 6px; }
+  .ux-metric__delta--up { color: var(--green-60); }
+  .ux-metric__delta--down { color: var(--green-60); }
+
+  /* ---- Usage tile ---- */
+  .ux-usage { margin-top: 24px; }
+  .ux-usage__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .ux-usage__bars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+
+  /* ---- Data table ---- */
+  .ux-table { border: 1px solid var(--border-subtle-01); background: var(--layer-02); }
+  .ux-table__toolbar { display: flex; align-items: center; gap: 8px; height: 48px; padding-left: 0; border-bottom: 1px solid var(--border-subtle-01); }
+  .ux-table__search { flex: 1; }
+  .ux-table table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .ux-table th { text-align: left; font-weight: 600; font-size: 14px; color: var(--text-primary); background: var(--layer-accent-01); padding: 14px 16px; border-bottom: 1px solid var(--border-subtle-01); }
+  .ux-table td { padding: 14px 16px; color: var(--text-secondary); border-bottom: 1px solid var(--border-subtle-01); }
+  .ux-table tr:last-child td { border-bottom: none; }
+  .ux-table tbody tr:hover { background: var(--layer-hover-01); }
+  .ux-table__name { color: var(--link-primary); font-weight: 400; }
+  .ux-table__actions button { display: grid; place-items: center; width: 32px; height: 32px; border: none; background: transparent; cursor: pointer; }
+  .ux-table__actions button:hover { background: var(--background-hover); }
+  .ux-table__empty { text-align: center; color: var(--text-secondary); padding: 32px; }
+
+  /* ---- Catalog ---- */
+  .ux-catalog__search { max-width: 480px; margin-bottom: 24px; }
+  .ux-catalog { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border-subtle-01); border: 1px solid var(--border-subtle-01); }
+  .ux-catalog .cds-tile { background: var(--layer-02); min-height: 168px; }
+  .ux-cat__top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .ux-cat__icon { color: var(--blue-60); display: inline-grid; }
+  .ux-cat__name { display: block; color: var(--text-primary); margin-bottom: 6px; }
+  .ux-cat__desc { color: var(--text-secondary); margin: 0; }
+
+  @media (max-width: 800px) {
+    .ux-metrics, .ux-usage__bars, .ux-catalog { grid-template-columns: 1fr 1fr; }
+    .ux-sidenav { position: absolute; height: calc(100vh - 48px); z-index: 20; transform: translateX(-100%); }
+    .ux-sidenav.is-open { transform: translateX(0); }
+  }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel" src="shell.jsx"></script>
+  <script type="text/babel" src="views.jsx"></script>
+  <script type="text/babel">
+    function App() {
+      const [navOpen, setNavOpen] = React.useState(true);
+      const [current, setCurrent] = React.useState('dashboard');
+      const view = current === 'catalog' ? <CatalogView /> : <DashboardView />;
+      return (
+        <div className="ux-app">
+          <Header onMenu={() => setNavOpen(o => !o)} />
+          <div className="ux-body">
+            <SideNav open={navOpen} current={current} onSelect={setCurrent} />
+            <main className="ux-main">{view}</main>
+          </div>
+        </div>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

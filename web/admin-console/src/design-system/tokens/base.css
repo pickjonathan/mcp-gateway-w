@@ -1,0 +1,63 @@
+/* ============================================================
+   CARBON — BASE / RESET
+   Minimal global defaults so consuming surfaces inherit the
+   Carbon type + color foundation without extra setup.
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;       /* body-compact-01 */
+  font-weight: var(--font-weight-regular);
+  line-height: 1.28572;
+  letter-spacing: 0.16px;
+  color: var(--text-primary);
+  background-color: var(--background);
+}
+
+/* Carbon links */
+a {
+  color: var(--link-primary);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--link-primary-hover);
+  text-decoration: underline;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+}
+
+/* Carbon focus ring — a 2px inset/outset solid, never a soft glow */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+/* Inline icon sizing convenience */
+.cds-icon {
+  display: inline-block;
+  width: var(--icon-size-01);
+  height: var(--icon-size-01);
+  vertical-align: middle;
+  fill: currentColor;
+}
+.cds-icon--20 { width: var(--icon-size-02); height: var(--icon-size-02); }
+.cds-icon--24 { width: 1.5rem; height: 1.5rem; }
+.cds-icon--32 { width: 2rem; height: 2rem; }

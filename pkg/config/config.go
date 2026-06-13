@@ -69,6 +69,11 @@ type Config struct {
 	// unauthenticated request floods can't amplify audit storage. Drops are
 	// counted in the mcp_audit_dropped_total metric.
 	AuditDenyPerMin int
+
+	// ConsoleOrigins is a comma-separated allowlist of browser origins permitted to
+	// call the control-plane admin API via CORS (the admin console SPA). Empty
+	// disables CORS. A read-only/observability accommodation — no authz change.
+	ConsoleOrigins string
 }
 
 var (
@@ -113,6 +118,7 @@ func load() *Config {
 		AuditRetention:         getDuration("MCP_AUDIT_RETENTION", 365*24*time.Hour),
 		BlockPrivateEgress:     getBool("MCP_BLOCK_PRIVATE_EGRESS", strings.EqualFold(env, "prod")),
 		AuditDenyPerMin:        getInt("MCP_AUDIT_DENY_PER_MIN", 600),
+		ConsoleOrigins:         getEnv("MCP_CONSOLE_ORIGINS", ""),
 	}
 }
 

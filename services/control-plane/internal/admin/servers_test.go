@@ -170,6 +170,35 @@ func TestAdmin_Credentials_WriteOnly(t *testing.T) {
 // TestAdmin_CredentialChange_Propagates verifies the control plane signals the
 // data plane on credential rotation (T079): org-level with userID "", per-user
 // with the caller's id, so the gateway rebuilds the right instance(s).
+// TestAdmin_CORS verifies the console-origin CORS allowlist (T008) — a preflight
+// from an allowed origin gets the Access-Control-Allow-Origin header. Auth is
+// unchanged (still enforced per request).
+func TestAdmin_CORS(t *testing.T) {
+	cfg := &config.Config{
+		BaseDomain:             "mcp.example.com",
+		KeycloakIssuerTemplate: "https://auth.mcp.example.com/realms/%s",
+		AdminAudience:          "https://api.mcp.example.com",
+		ShutdownTimeout:        time.Second,
+		ConsoleOrigins:         "https://acme.mcp.example.com",
+	}
+	validator := authz.NewJWTValidator(cfg.BaseDomain, cfg.KeycloakIssuerTemplate, authz.NewJWKSKeySource())
+	api := NewAPI(cfg, zerolog.Nop(), NewMemStore(), &recordingSink{}, secrets.NewMemStore(), audit.NewMemLogger(), validator)
+	srv := httptest.NewServer(api.e)
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodOptions, srv.URL+"/v1/orgs/acme/servers", nil)
+	req.Header.Set("Origin", "https://acme.mcp.example.com")
+	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "https://acme.mcp.example.com" {
+		t.Fatalf("Access-Control-Allow-Origin = %q, want the allowed origin", got)
+	}
+}
+
 func TestAdmin_CredentialChange_Propagates(t *testing.T) {
 	mcp := fakeMCP(t)
 	defer mcp.Close()

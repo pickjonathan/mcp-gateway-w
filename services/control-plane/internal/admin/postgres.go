@@ -18,7 +18,7 @@ type PostgresStore struct {
 	pool *pgxpool.Pool
 }
 
-const serverCols = "id, org_id, slug, type, endpoint_url, command, args, env, credential_mode, allowed_roles, enabled, health, health_detail, created_at"
+const serverCols = "id, org_id, slug, type, endpoint_url, command, args, env, credential_mode, allowed_roles, enabled, health, health_detail, created_at, credential_set"
 
 // NewPostgresStore connects to dsn, verifies connectivity, and ensures the schema.
 func NewPostgresStore(ctx context.Context, dsn string) (*PostgresStore, error) {
@@ -66,6 +66,7 @@ func (s *PostgresStore) migrate(ctx context.Context) error {
   created_at      timestamptz NOT NULL,
   UNIQUE (org_id, slug)
 );`,
+		`ALTER TABLE mcp_servers ADD COLUMN IF NOT EXISTS credential_set boolean NOT NULL DEFAULT false;`,
 		`ALTER TABLE mcp_servers ENABLE ROW LEVEL SECURITY;`,
 		`ALTER TABLE mcp_servers FORCE ROW LEVEL SECURITY;`,
 		`DROP POLICY IF EXISTS org_isolation ON mcp_servers;`,
@@ -112,9 +113,9 @@ func (s *PostgresStore) Create(srv Server) (Server, error) {
 	args, env, roles := jsonStr(srv.Args), jsonStr(srv.Env), jsonStr(srv.AllowedRoles)
 	err := s.withOrg(context.Background(), srv.OrgID, func(tx pgx.Tx) error {
 		_, err := tx.Exec(context.Background(),
-			`INSERT INTO mcp_servers (`+serverCols+`) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+			`INSERT INTO mcp_servers (`+serverCols+`) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
 			srv.ID, srv.OrgID, srv.Slug, string(srv.Type), srv.EndpointURL, srv.Command, args, env,
-			srv.CredentialMode, roles, srv.Enabled, string(srv.Health), srv.HealthDetail, srv.CreatedAt)
+			srv.CredentialMode, roles, srv.Enabled, string(srv.Health), srv.HealthDetail, srv.CreatedAt, srv.CredentialSet)
 		return err
 	})
 	if err != nil {
@@ -172,10 +173,10 @@ func (s *PostgresStore) Update(srv Server) (Server, error) {
 	err := s.withOrg(context.Background(), srv.OrgID, func(tx pgx.Tx) error {
 		tag, err := tx.Exec(context.Background(),
 			`UPDATE mcp_servers SET slug=$3, type=$4, endpoint_url=$5, command=$6, args=$7, env=$8,
-			 credential_mode=$9, allowed_roles=$10, enabled=$11, health=$12, health_detail=$13
+			 credential_mode=$9, allowed_roles=$10, enabled=$11, health=$12, health_detail=$13, credential_set=$14
 			 WHERE org_id=$1 AND id=$2`,
 			srv.OrgID, srv.ID, srv.Slug, string(srv.Type), srv.EndpointURL, srv.Command, args, env,
-			srv.CredentialMode, roles, srv.Enabled, string(srv.Health), srv.HealthDetail)
+			srv.CredentialMode, roles, srv.Enabled, string(srv.Health), srv.HealthDetail, srv.CredentialSet)
 		affected = tag.RowsAffected()
 		return err
 	})
@@ -211,7 +212,7 @@ func scanServer(sc rowScanner) (Server, error) {
 	var srv Server
 	var typ, health, argsS, envS, rolesS string
 	if err := sc.Scan(&srv.ID, &srv.OrgID, &srv.Slug, &typ, &srv.EndpointURL, &srv.Command,
-		&argsS, &envS, &srv.CredentialMode, &rolesS, &srv.Enabled, &health, &srv.HealthDetail, &srv.CreatedAt); err != nil {
+		&argsS, &envS, &srv.CredentialMode, &rolesS, &srv.Enabled, &health, &srv.HealthDetail, &srv.CreatedAt, &srv.CredentialSet); err != nil {
 		return Server{}, err
 	}
 	srv.Type = ServerType(typ)
