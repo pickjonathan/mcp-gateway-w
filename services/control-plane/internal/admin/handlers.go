@@ -121,11 +121,21 @@ func (h *Handlers) Get(c echo.Context) error {
 	return c.JSON(http.StatusOK, s)
 }
 
+// patchReq carries the mutable server fields. All are pointers so a PATCH only
+// touches the fields the caller actually sends (the console edits type/endpoint/
+// command/args/env/credentials/allowed_roles/enabled).
 type patchReq struct {
-	Enabled *bool `json:"enabled"`
+	Enabled        *bool              `json:"enabled"`
+	Type           *ServerType        `json:"type"`
+	EndpointURL    *string            `json:"endpoint_url"`
+	Command        *string            `json:"command"`
+	Args           *[]string          `json:"args"`
+	Env            *map[string]string `json:"env"`
+	CredentialMode *string            `json:"credential_mode"`
+	AllowedRoles   *[]string          `json:"allowed_roles"`
 }
 
-// Patch updates mutable fields (currently enabled) and re-propagates.
+// Patch updates the provided mutable fields and re-propagates to the data plane.
 func (h *Handlers) Patch(c echo.Context) error {
 	org, id := c.Param("org"), c.Param("id")
 	s, err := h.store.Get(org, id)
@@ -138,6 +148,27 @@ func (h *Handlers) Patch(c echo.Context) error {
 	}
 	if req.Enabled != nil {
 		s.Enabled = *req.Enabled
+	}
+	if req.Type != nil {
+		s.Type = *req.Type
+	}
+	if req.EndpointURL != nil {
+		s.EndpointURL = *req.EndpointURL
+	}
+	if req.Command != nil {
+		s.Command = *req.Command
+	}
+	if req.Args != nil {
+		s.Args = *req.Args
+	}
+	if req.Env != nil {
+		s.Env = *req.Env
+	}
+	if req.CredentialMode != nil {
+		s.CredentialMode = *req.CredentialMode
+	}
+	if req.AllowedRoles != nil {
+		s.AllowedRoles = *req.AllowedRoles
 	}
 	updated, err := h.store.Update(s)
 	if err != nil {

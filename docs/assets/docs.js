@@ -11,7 +11,9 @@
     { file: "solution-comparison.md", title: "Solution Comparison", html: "solution-comparison.html" },
     { file: "data-model.md", title: "Data Model", html: "data-model.html" },
     { file: "local-dev.md", title: "Local Dev & Runbook", html: "local-dev.html" },
-    { file: "local-sandbox.md", title: "Local gVisor Sandbox", html: "local-sandbox.html" }
+    { file: "local-sandbox.md", title: "Local gVisor Sandbox", html: "local-sandbox.html" },
+    { file: "multi-tenant-keycloak.md", title: "Multi-tenant (Keycloak)", html: "multi-tenant-keycloak.html" },
+    { file: "mcp-inspector-rbac.md", title: "MCP Clients & RBAC", html: "mcp-inspector-rbac.html" }
   ];
   var current = document.body.dataset.doc || "README.md";
 
