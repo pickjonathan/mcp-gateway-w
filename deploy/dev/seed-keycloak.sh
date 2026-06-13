@@ -26,6 +26,8 @@ COMPOSE="$SCRIPT_DIR/compose.yaml"
 : "${CLIENT_ID:=mcp-admin-console}"
 : "${CONSOLE_ORIGIN:=http://localhost:5173}"
 : "${ADMIN_AUDIENCE:=https://api.mcp.example.com}"
+: "${MCP_CLIENT_ID:=mcp-client}"           # client for MCP clients hitting the gateway /mcp
+: "${BASE_DOMAIN:=mcp.example.com}"         # gateway MCP_BASE_DOMAIN → resource https://{realm}.{base}/mcp
 : "${ADMIN_USER:=admin}"
 : "${ADMIN_PW:=admin}"
 : "${ACCESS_TTL:=900}"      # access-token lifespan (seconds) — 15m
@@ -39,6 +41,7 @@ echo "Seeding Keycloak (realm=$REALM, client=$CLIENT_ID) — DEV ONLY…"
 docker compose -f "$COMPOSE" exec -T \
   -e REALM="$REALM" -e CLIENT_ID="$CLIENT_ID" -e CONSOLE_ORIGIN="$CONSOLE_ORIGIN" \
   -e ADMIN_AUDIENCE="$ADMIN_AUDIENCE" -e ADMIN_USER="$ADMIN_USER" -e ADMIN_PW="$ADMIN_PW" \
+  -e MCP_CLIENT_ID="$MCP_CLIENT_ID" -e BASE_DOMAIN="$BASE_DOMAIN" \
   -e ACCESS_TTL="$ACCESS_TTL" -e SSO_IDLE="$SSO_IDLE" -e SSO_MAX="$SSO_MAX" \
   -e KC_ADMIN="$KC_ADMIN" -e KC_ADMIN_PW="$KC_ADMIN_PW" \
   keycloak bash -s <<'KCADM'
@@ -112,6 +115,38 @@ case "$MAPPERS" in
 esac
 echo "  mappers: ok"
 
+# --- Public MCP client (for MCP clients — Inspector, mcp-remote, etc. — that
+#     connect to the gateway /mcp). The gateway requires the token audience to
+#     equal the org's MCP resource URL; an audience mapper supplies it. Direct
+#     grants are enabled for dev so a token can be minted from a script/curl. ---
+MCP_RESOURCE="https://$REALM.$BASE_DOMAIN/mcp"
+MCID=$($K get clients -r "$REALM" -q "clientId=$MCP_CLIENT_ID" --fields id --format csv --noquotes 2>/dev/null | tr -d '\r')
+if [ -z "$MCID" ]; then
+  $K create clients -r "$REALM" \
+    -s "clientId=$MCP_CLIENT_ID" -s 'name=MCP Client' \
+    -s publicClient=true -s standardFlowEnabled=true -s directAccessGrantsEnabled=true \
+    -s 'redirectUris=["http://localhost:*","http://127.0.0.1:*"]' -s 'webOrigins=["+"]' \
+    -s 'attributes={"pkce.code.challenge.method":"S256"}'
+  MCID=$($K get clients -r "$REALM" -q "clientId=$MCP_CLIENT_ID" --fields id --format csv --noquotes | tr -d '\r')
+  echo "  client $MCP_CLIENT_ID: created ($MCID)"
+else
+  $K update "clients/$MCID" -r "$REALM" \
+    -s publicClient=true -s standardFlowEnabled=true -s directAccessGrantsEnabled=true \
+    -s 'redirectUris=["http://localhost:*","http://127.0.0.1:*"]' -s 'webOrigins=["+"]' \
+    -s 'attributes={"pkce.code.challenge.method":"S256"}'
+  echo "  client $MCP_CLIENT_ID: updated ($MCID)"
+fi
+MCP_MAPPERS=$($K get "clients/$MCID/protocol-mappers/models" -r "$REALM" --fields name --format csv --noquotes 2>/dev/null | tr -d '\r')
+case "$MCP_MAPPERS" in
+  *mcp-audience*) : ;;
+  *) $K create "clients/$MCID/protocol-mappers/models" -r "$REALM" \
+       -s name=mcp-audience -s protocol=openid-connect -s protocolMapper=oidc-audience-mapper \
+       -s "config.\"included.custom.audience\"=$MCP_RESOURCE" \
+       -s 'config."access.token.claim"=true' -s 'config."id.token.claim"=false'
+     echo "  mapper mcp-audience: created" ;;
+esac
+echo "  client $MCP_CLIENT_ID: ok (audience=$MCP_RESOURCE)"
+
 # --- Admin user (USER_ID — bash reserves UID) ---
 USER_ID=$($K get users -r "$REALM" -q "username=$ADMIN_USER" --fields id --format csv --noquotes 2>/dev/null | head -1 | tr -d '\r')
 if [ -z "$USER_ID" ]; then
@@ -125,5 +160,5 @@ $K set-password -r "$REALM" --username "$ADMIN_USER" --new-password "$ADMIN_PW"
 $K add-roles -r "$REALM" --uusername "$ADMIN_USER" --rolename admin 2>/dev/null || true
 echo "  user $ADMIN_USER: password set + admin role assigned"
 
-echo "✅ Keycloak seeded: realm=$REALM, login=$ADMIN_USER/$ADMIN_PW, access-token TTL=${ACCESS_TTL}s"
+echo "✅ Keycloak seeded: realm=$REALM, login=$ADMIN_USER/$ADMIN_PW, console=$CLIENT_ID, mcp=$MCP_CLIENT_ID, TTL=${ACCESS_TTL}s"
 KCADM
