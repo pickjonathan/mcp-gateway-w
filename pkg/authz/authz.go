@@ -11,9 +11,10 @@ import (
 
 // Principal is the resolved identity for an authenticated request.
 type Principal struct {
-	OrgID  string
-	UserID string
-	Roles  []string
+	OrgID    string
+	UserID   string // token subject (stable id)
+	Username string // preferred_username (display/audit only)
+	Roles    []string
 }
 
 // HasRole reports whether the principal carries the given role.
