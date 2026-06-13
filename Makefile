@@ -16,6 +16,7 @@ build:
 run: run-gateway
 run-gateway:
 	$(DEV_ENV) MCP_HTTP_ADDR=:8080 MCP_SANDBOX_RUNTIME=exec \
+		MCP_RESOURCE_TEMPLATE='http://%s.mcp.example.com:8080/mcp' \
 		go run ./services/gateway/cmd/gateway
 
 # Admin/control plane on :8090 (CORS for the console; admin-API audience).
