@@ -19,5 +19,7 @@ export default defineConfig({
       },
     },
   },
-  build: { outDir: 'dist', sourcemap: true },
+  // The Monaco JSON editor is a deliberately large, lazy-loaded chunk (only
+  // pulled when the "Paste JSON" tab opens), so raise the warning ceiling.
+  build: { outDir: 'dist', sourcemap: true, chunkSizeWarningLimit: 3500 },
 })
