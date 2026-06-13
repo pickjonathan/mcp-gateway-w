@@ -42,7 +42,8 @@ func MCPResource(org, baseDomain, template string) string {
 
 type claims struct {
 	jwt.RegisteredClaims
-	RealmAccess struct {
+	PreferredUsername string `json:"preferred_username"`
+	RealmAccess       struct {
 		Roles []string `json:"roles"`
 	} `json:"realm_access"`
 }
@@ -89,5 +90,5 @@ func (v *JWTValidator) verify(ctx context.Context, raw, org, audience string) (*
 	if c.Subject == "" {
 		return nil, fmt.Errorf("%w: missing subject", ErrInvalid)
 	}
-	return &Principal{OrgID: org, UserID: c.Subject, Roles: c.RealmAccess.Roles}, nil
+	return &Principal{OrgID: org, UserID: c.Subject, Username: c.PreferredUsername, Roles: c.RealmAccess.Roles}, nil
 }

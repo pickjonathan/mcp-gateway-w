@@ -45,6 +45,9 @@ func tracingMiddleware(tracer trace.Tracer) echo.MiddlewareFunc {
 			span.SetAttributes(attribute.Int("http.response.status_code", status))
 			if p, ok := c.Get("principal").(*authz.Principal); ok && p != nil {
 				span.SetAttributes(attribute.String("mcp.org", p.OrgID))
+				if p.Username != "" {
+					span.SetAttributes(attribute.String("mcp.user", p.Username))
+				}
 			}
 			return err
 		}
