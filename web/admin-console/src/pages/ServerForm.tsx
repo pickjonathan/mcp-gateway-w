@@ -1,21 +1,29 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   useServer,
   useCreateServer,
   useUpdateServer,
+  useImportServers,
   type CreateServerInput,
   type CredentialMode,
+  type ImportResult,
   type ServerType,
 } from '../api/servers'
 import { ApiError } from '../api/client'
+import { parseMcpServersConfig, mcpServersTemplate } from '../features/servers/mcpConfig'
 import { Button } from '../design-system/components/core/Button'
 import { Tile } from '../design-system/components/core/Tile'
 import { TextInput } from '../design-system/components/forms/TextInput'
 import { Select } from '../design-system/components/forms/Select'
 import { Toggle } from '../design-system/components/forms/Toggle'
 import { InlineNotification } from '../design-system/components/feedback/InlineNotification'
+import { Loading } from '../app/feedback/states'
 import { useNotify } from '../app/feedback/notifications'
+
+// Monaco is heavy; load it only when the JSON tab is opened (keeps it out of
+// the form-mode path and out of jsdom tests entirely).
+const JsonConfigEditor = lazy(() => import('../features/servers/JsonConfigEditor'))
 
 interface Errors {
   slug?: string
@@ -42,6 +50,32 @@ export function ServerForm() {
   const [rolesText, setRolesText] = useState('')
   const [enabled, setEnabled] = useState(true)
   const [errors, setErrors] = useState<Errors>({})
+
+  // JSON-import mode (Add only): paste a standard mcpServers config.
+  const [mode, setMode] = useState<'form' | 'json'>('form')
+  const [jsonText, setJsonText] = useState(mcpServersTemplate)
+  const [importResults, setImportResults] = useState<ImportResult[] | null>(null)
+  const importMut = useImportServers()
+  const parsed = useMemo(() => parseMcpServersConfig(jsonText), [jsonText])
+
+  function onImport() {
+    setImportResults(null)
+    if (parsed.errors.length > 0 || parsed.inputs.length === 0) return
+    importMut.mutate(parsed.inputs, {
+      onSuccess: (results) => {
+        setImportResults(results)
+        const ok = results.filter((r) => r.ok).length
+        const failed = results.length - ok
+        if (failed === 0) {
+          notify('success', `Imported ${ok} server${ok === 1 ? '' : 's'}`)
+          navigate('/servers')
+        } else {
+          notify('error', `Imported ${ok}/${results.length}`, `${failed} failed — see details below`)
+        }
+      },
+      onError: (e) => notify('error', 'Import failed', e instanceof Error ? e.message : String(e)),
+    })
+  }
 
   useEffect(() => {
     if (!existing) return
@@ -102,11 +136,24 @@ export function ServerForm() {
   const busy = create.isPending || update.isPending
 
   return (
-    <section style={{ maxWidth: 640 }}>
+    <section style={{ maxWidth: mode === 'json' ? 860 : 640 }}>
       <h1 style={{ fontSize: 'var(--type-scale-06)', marginBottom: 'var(--spacing-05)' }}>
         {editing ? 'Edit server' : 'Add server'}
       </h1>
+
+      {!editing && (
+        <div role="tablist" aria-label="Add method" style={{ display: 'flex', gap: 4, marginBottom: 'var(--spacing-05)' }}>
+          <Button kind={mode === 'form' ? 'primary' : 'secondary'} size="sm" type="button" onClick={() => setMode('form')}>
+            Form
+          </Button>
+          <Button kind={mode === 'json' ? 'primary' : 'secondary'} size="sm" type="button" onClick={() => setMode('json')}>
+            Paste JSON
+          </Button>
+        </div>
+      )}
+
       <Tile>
+        {mode === 'form' ? (
         <form onSubmit={onSubmit} style={{ display: 'grid', gap: 'var(--spacing-05)' }}>
           {errors.form && <InlineNotification kind="error" title="Could not save" subtitle={errors.form} />}
 
@@ -186,6 +233,72 @@ export function ServerForm() {
             </Button>
           </div>
         </form>
+        ) : (
+          <div style={{ display: 'grid', gap: 'var(--spacing-05)' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--type-scale-02)', margin: 0 }}>
+              Paste a standard <code>mcpServers</code> config (Claude Desktop / VS&nbsp;Code format). It is validated
+              against the MCP schema as you type; every entry is imported.
+            </p>
+
+            <Suspense fallback={<Loading label="Loading editor…" />}>
+              <JsonConfigEditor
+                value={jsonText}
+                onChange={(v) => {
+                  setJsonText(v)
+                  setImportResults(null)
+                }}
+              />
+            </Suspense>
+
+            {parsed.errors.length > 0 ? (
+              <InlineNotification kind="error" title="Fix before importing" subtitle={parsed.errors.join(' · ')} hideClose />
+            ) : (
+              <InlineNotification
+                kind="success"
+                title={`${parsed.inputs.length} server${parsed.inputs.length === 1 ? '' : 's'} ready to import`}
+                subtitle={parsed.inputs.map((i) => `${i.slug} (${i.type === 'stdio' ? 'stdio' : 'remote'})`).join(', ')}
+                hideClose
+              />
+            )}
+
+            {parsed.warnings.map((w, i) => (
+              <InlineNotification key={i} kind="warning" title="Note" subtitle={w} hideClose />
+            ))}
+
+            {importResults && (
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 4 }}>
+                {importResults.map((r) => (
+                  <li
+                    key={r.slug}
+                    style={{
+                      fontSize: 'var(--type-scale-02)',
+                      color: r.ok ? 'var(--support-success, #198038)' : 'var(--support-error, #da1e28)',
+                    }}
+                  >
+                    {r.ok ? '✓' : '✗'} {r.slug}
+                    {r.error ? ` — ${r.error}` : ''}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div style={{ display: 'flex', gap: 'var(--spacing-04)' }}>
+              <Button
+                kind="primary"
+                type="button"
+                disabled={parsed.errors.length > 0 || parsed.inputs.length === 0 || importMut.isPending}
+                onClick={onImport}
+              >
+                {importMut.isPending
+                  ? 'Importing…'
+                  : `Import ${parsed.inputs.length} server${parsed.inputs.length === 1 ? '' : 's'}`}
+              </Button>
+              <Button kind="secondary" type="button" onClick={() => navigate('/servers')} disabled={importMut.isPending}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
       </Tile>
     </section>
   )

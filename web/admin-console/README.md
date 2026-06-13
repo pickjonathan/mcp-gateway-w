@@ -31,10 +31,53 @@ Keycloak :8081, Prometheus :9090).
 | `npm run lint` | oxlint with the Carbon **adherence** config |
 | `npm run test:e2e` | Playwright + axe (needs `npx playwright install` + a mock-backed dev server) |
 
+## Adding servers from JSON (`mcpServers`)
+
+**Add server → Paste JSON** accepts the standard `mcpServers` config (Claude
+Desktop / VS&nbsp;Code / Cursor format) in an embedded Monaco editor with live
+schema validation, then bulk-creates every entry:
+
+```json
+{
+  "mcpServers": {
+    "awslabs.aws-api-mcp-server": {
+      "command": "uvx",
+      "args": ["awslabs.aws-api-mcp-server@latest"],
+      "env": { "AWS_REGION": "us-east-1" },
+      "disabled": false
+    }
+  }
+}
+```
+
+`command` ⇒ stdio server, `url` ⇒ remote; `disabled:true` ⇒ created disabled.
+Mapping + validation live in [`src/features/servers/mcpConfig.ts`](src/features/servers/mcpConfig.ts)
+(pure + unit-tested). `env` values are stored as server config (visible to admins) —
+use a server's **Credentials** tab for secrets.
+
+### Validate the same JSON in VS Code
+
+The schema is published at [`public/mcp-servers.schema.json`](public/mcp-servers.schema.json).
+Point VS Code at it (workspace `.vscode/settings.json` or user settings) to get the
+same squiggles/autocomplete while editing config files:
+
+```jsonc
+{
+  "json.schemas": [
+    {
+      "fileMatch": ["**/mcp*.json", "**/*mcp-servers*.json"],
+      "url": "./web/admin-console/public/mcp-servers.schema.json"
+    }
+  ]
+}
+```
+
 ## Build output / performance budget
 
-Production bundle (gzip): **JS ≈ 80 KB**, CSS ≈ 3 KB. Comfortably under a 250 KB
-first-load budget — first meaningful paint < 2s on broadband (SC-001/SC-007).
+First-load bundle (gzip): **JS ≈ 100 KB**, CSS ≈ 3 KB — under a 250 KB budget,
+first meaningful paint < 2s on broadband (SC-001/SC-007). The Monaco JSON editor
+is a **lazy chunk** (≈ 600 KB gzip) fetched only when the "Paste JSON" tab opens,
+so it never affects first load.
 
 ## Layout
 
@@ -44,7 +87,7 @@ src/
   auth/        OAuth2 PKCE (oidc), AuthProvider/session, org-from-host, RequireAdmin guard
   api/         typed control-plane client + TanStack Query hooks (servers, credentials, audit, quotas, metrics)
   pages/       SignIn, Callback, Forbidden, Dashboard, Servers, ServerForm, ServerDetail, Audit, Settings
-  features/    dashboard, servers (ConfirmDialog), credentials, rbac
+  features/    dashboard, servers (ConfirmDialog, mcpConfig parser + JsonConfigEditor/Monaco), credentials, rbac
   design-system/  VENDORED Carbon: tokens, components, icons, shell, styles.css
 tests/         unit, contract, adversarial, a11y (vitest); e2e (Playwright); mocks (MSW)
 ```
