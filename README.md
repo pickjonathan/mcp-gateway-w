@@ -7,13 +7,65 @@ infrastructure work of their own.
 
 Go module: `github.com/acme-corp/mcp-runtime` (Go 1.25).
 
-## Quick start
+## Run it locally
+
+**Prerequisites:** Docker Desktop, Go 1.25, Node 20+.
+
+### 1 · Infrastructure + identity
 
 ```sh
-go build ./... && go test ./...        # build + hermetic test suite
-/dev-setup                             # bring up the dev stack (Claude Code skill)
-make run                               # gateway on :8080 (dev: exec sandbox = UNSANDBOXED)
+make dev-up    # docker: postgres, redis, vault, keycloak, minio, prometheus, grafana, jaeger
+               # then seeds the Keycloak `acme` realm — idempotent (see deploy/dev/seed-keycloak.sh)
 ```
+
+### 2 · The services (each in its own terminal)
+
+```sh
+make run-control-plane    # admin API on :8090
+make run-gateway          # data plane (/mcp) on :8080  — exec sandbox = UNSANDBOXED, dev only
+cd web/admin-console && npm install && npm run dev   # admin console on :5173
+```
+
+These run your local code against the stack with the right dev env baked in
+(local Keycloak issuer, traces → Jaeger). `make run` is an alias for `run-gateway`.
+
+### 3 · Open everything
+
+| UI | URL | Login |
+|---|---|---|
+| **Admin console** | http://localhost:5173 | `admin`/`admin` or `alice`/`alice` |
+| **MCP Inspector** | `npx @modelcontextprotocol/inspector` → http://localhost:6274 | proxy token is printed |
+| **Jaeger** — traces & spans | http://localhost:16686 | — (services: `mcp-gateway`, `mcp-control-plane`) |
+| **Grafana** — "MCP Runtime Overview" | http://localhost:3000 | anonymous Admin |
+| **Prometheus** | http://localhost:9090 | — |
+| **MinIO** — audit WORM bucket | http://localhost:9001 | `minioadmin`/`minioadmin` |
+| **Keycloak** | http://localhost:8081 | `admin`/`admin` |
+
+### Logins & users
+
+- **`admin`/`admin`** — org admin (manage servers, credentials, RBAC, audit in the console).
+- **`alice`/`alice`** — a member (can use *open* servers; *gated* servers need a matching realm role).
+- Add/invite users in Keycloak → realm `acme` → **Users**. Model + steps: [Multi-tenant (Keycloak)](docs/multi-tenant-keycloak.md).
+
+### Connect an MCP client
+
+Add `127.0.0.1 acme.mcp.example.com` to `/etc/hosts`, then point a client at
+**`http://acme.mcp.example.com:8080/mcp`** (Transport: *Streamable HTTP*). For the
+local HTTP endpoint, authenticate with a **Bearer token** (the OAuth *flow*
+validates against the canonical `https://{org}.{base}/mcp`, which only matches
+behind a TLS edge). Full walkthrough + per-user RBAC validation:
+[MCP Clients & RBAC](docs/mcp-inspector-rbac.md).
+
+### How the pieces fit (dev notes)
+
+- The Go services run on the **host** so the OIDC issuer is
+  `http://localhost:8081/realms/{org}` — the exact issuer browser/Inspector tokens
+  carry. Prometheus (in Docker) scrapes them via `host.docker.internal`.
+- Tracing is on by default (`MCP_OTLP_ENDPOINT=localhost:4318` → Jaeger). Generate
+  a trace by making any `/mcp` or console request, then explore the span tree in Jaeger.
+- `make dev-down` tears everything down (including volumes).
+
+> **Hermetic build/test** (no stack needed): `go build ./... && go test ./...`.
 
 ## Documentation
 
@@ -30,6 +82,8 @@ Full docs live in [`docs/`](docs/) and render as a small site:
 | [Data Model](docs/data-model.md) | Entities & relationships |
 | [Local Dev & Runbook](docs/local-dev.md) | Stack, endpoints, integration tests |
 | [Local gVisor Sandbox](docs/local-sandbox.md) | The HC-3 boundary locally |
+| [Multi-tenant (Keycloak)](docs/multi-tenant-keycloak.md) | Realm-per-org, onboarding, MCP scopes, roles, invites |
+| [MCP Clients & RBAC](docs/mcp-inspector-rbac.md) | Connect the Inspector/clients; validate per-user tool access |
 
 ### Viewing the docs site
 

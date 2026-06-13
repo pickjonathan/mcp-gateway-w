@@ -1,5 +1,9 @@
-# Dev scrape config for the MCP runtime. Prometheus reaches the services over the
-# compose network by service name. Open http://localhost:9090 to query, e.g.:
+# Dev scrape config for the MCP runtime. Targets use host.docker.internal so a
+# single config works whether the gateway/control-plane run in compose or via
+# `make run-gateway`/`make run-control-plane` on the host — both publish to the
+# host's :8080/:8090. (Docker Desktop resolves host.docker.internal automatically;
+# on Linux add `extra_hosts: ["host.docker.internal:host-gateway"]` to prometheus.)
+# Open http://localhost:9090 to query, e.g.:
 #   mcp_requests_total
 #   rate(mcp_tool_calls_total[1m])
 global:
@@ -11,7 +15,7 @@ rule_files:
 scrape_configs:
   - job_name: gateway
     static_configs:
-      - targets: ["gateway:8080"]
+      - targets: ["host.docker.internal:8080"]
   - job_name: control-plane
     static_configs:
-      - targets: ["control-plane:8090"]
+      - targets: ["host.docker.internal:8090"]
