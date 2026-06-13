@@ -76,16 +76,19 @@ npx @modelcontextprotocol/inspector          # serves the UI on http://localhost
 Open the printed URL (it includes a one-time `MCP_PROXY_AUTH_TOKEN`), then set:
 
 1. **Transport Type** → `Streamable HTTP`
-2. **URL** → `http://acme.mcp.example.com:8080/mcp`
-3. **Authentication** — either:
-   - paste a token so the Inspector sends `Authorization: Bearer <token>`, **or**
-   - use the built-in **OAuth** flow. **Set the Client ID to `mcp-client`** in the
-     OAuth settings so the Inspector uses the pre-registered PKCE client instead of
-     Dynamic Client Registration (Keycloak's policy blocks DCR, and a DCR client
-     wouldn't carry the required audience). The Inspector reads the gateway's
-     metadata, redirects you to the `acme` realm to log in (`alice`/`alice`), and
-     captures the token via PKCE.
-4. **Connect** → **List Tools**.
+2. **URL** → `http://acme.mcp.example.com:8080/mcp` (Connection Type: `Via Proxy`)
+3. **Authentication** — expand the panel and pick one:
+   - **OAuth (auto-refreshing, recommended):** under **OAuth 2.0 Flow** set
+     **Client ID = `mcp-client`** and **Scope = `openid`**, then **Quick OAuth Flow**
+     → log in (`alice`/`alice`) → **Connect**. Setting the Client ID makes it use the
+     pre-registered PKCE client and **skip Dynamic Client Registration** (Keycloak
+     blocks DCR, and a DCR client wouldn't carry the required audience). The Inspector
+     then refreshes the token for you.
+   - **Bearer token (manual):** under **Custom Headers** set `Authorization` =
+     `Bearer <token>` and enable the row's toggle (mint a token with the snippet
+     above). Simpler, but re-mint every ~15 min.
+4. **Connect → List Tools** → the gateway's aggregated tools appear, namespaced
+   `<server-slug>__<tool>`.
 
 > **Why the Client ID matters.** The gateway requires the token audience to equal
 > the MCP resource it advertises. Locally that's `http://acme.mcp.example.com:8080/mcp`

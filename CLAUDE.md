@@ -33,12 +33,17 @@ published via GitHub Pages — see `docs/index.html`).
 ### Build / test / run
 
 ```sh
-go build ./...                 # build everything
-go test ./...                  # hermetic suite (integration tests skip without MCP_TEST_* env)
-go vet ./...
-make run                       # gateway on :8080 (exec sandbox = UNSANDBOXED dev only)
-/dev-setup                     # skill: verify prereqs + bring up the dev stack
+go build ./... && go test ./... && go vet ./...   # hermetic (integration tests skip without MCP_TEST_*)
+make dev-up                    # docker infra (postgres/redis/vault/keycloak/minio/prometheus/grafana/jaeger) + seeds Keycloak
+make run-control-plane         # admin API :8090           (own terminal)
+make run-gateway               # data plane /mcp :8080      (exec sandbox = UNSANDBOXED dev only; `make run` aliases this)
+cd web/admin-console && npm run dev   # admin console :5173
 ```
+
+Full walkthrough + dashboards table in the **README "Run it locally"**. Dashboards:
+console :5173 · Jaeger (traces) :16686 · Grafana :3000 · Prometheus :9090 · MinIO :9001 · Keycloak :8081.
+Dev logins (seeded by `deploy/dev/seed-keycloak.sh`): `admin`/`admin` (org admin), `alice`/`alice` (member).
+The `run-*` targets bake in the dev env (local Keycloak issuer, OTLP→Jaeger, exec sandbox).
 
 Live integration tests are guarded by env vars (run against the dev stack):
 `MCP_TEST_POSTGRES_DSN`, `MCP_TEST_REDIS_ADDR`, `MCP_TEST_VAULT_ADDR`, `MCP_TEST_S3_ENDPOINT`.
@@ -53,6 +58,23 @@ Live integration tests are guarded by env vars (run against the dev stack):
   per-user, with rotation), and routes to **remote HTTP** clients or **sandboxed
   stdio** servers. Untrusted stdio code runs in a microVM/gVisor sandbox with no
   network; remote egress is SSRF-guarded.
+
+### Connecting MCP clients (data plane)
+
+- Clients (MCP Inspector, Claude Desktop, `mcp-remote`) connect to
+  `{org}.{base-domain}/mcp` (dev: `http://acme.mcp.example.com:8080/mcp` + a
+  `127.0.0.1 acme.mcp.example.com` hosts entry) via OAuth 2.1 + PKCE against the
+  org's Keycloak realm.
+- `deploy/dev/seed-keycloak.sh` registers two per-realm OAuth clients:
+  `mcp-admin-console` (console; admin-API audience) and `mcp-client` (data plane;
+  audience = the MCP resource URL).
+- The gateway advertises the MCP **resource** (RFC 9728) and requires it as the
+  token audience. `MCP_RESOURCE_TEMPLATE` overrides the canonical
+  `https://{org}.{base}/mcp`; dev uses `http://%s.mcp.example.com:8080/mcp` so the
+  Inspector's OAuth flow works over plain HTTP (set its **Client ID `mcp-client`**
+  to skip Dynamic Client Registration).
+- Tool visibility/use is gated by per-server `allowed_roles` × the user's realm
+  roles. See `docs/multi-tenant-keycloak.md` and `docs/mcp-inspector-rbac.md`.
 
 ### Conventions
 
