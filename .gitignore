@@ -25,3 +25,6 @@ coverage*
 .playwright-mcp/
 *.zip
 admin-console-*.png
+
+# Playwright walkthrough screenshots (root)
+/*.png

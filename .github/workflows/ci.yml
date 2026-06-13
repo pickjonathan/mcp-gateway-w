@@ -18,6 +18,10 @@ jobs:
       - run: go test ./...
       - uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          # Build golangci-lint from source with the Go toolchain above (1.25)
+          # instead of its prebuilt binary (go1.24), which refuses to lint a
+          # go1.25 module ("build Go version is lower than the targeted Go version").
+          version: v1.64.8
+          install-mode: goinstall
   # NOTE (Constitution Principle V): the adversarial security suite (tests/security)
   # and contract tests (tests/contract) become required gates as US1/US3/US4 land.

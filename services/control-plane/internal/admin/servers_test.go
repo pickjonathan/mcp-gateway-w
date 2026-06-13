@@ -123,6 +123,38 @@ func TestAdmin_CRUD_RemoteHTTP(t *testing.T) {
 	}
 }
 
+func TestAdmin_Patch_UpdatesAllowedRoles(t *testing.T) {
+	mcp := fakeMCP(t)
+	defer mcp.Close()
+	base, adminTok, _, _, _, cleanup := setupAdminAPI(t)
+	defer cleanup()
+
+	_, b := do(t, http.MethodPost, base+"/v1/orgs/acme/servers", adminTok,
+		`{"slug":"echo","type":"remote_http","endpoint_url":"`+mcp.URL+`"}`)
+	var srv Server
+	_ = json.Unmarshal(b, &srv)
+
+	// PATCH must apply allowed_roles, not only enabled (the console's Access/RBAC
+	// tab and edit form rely on this). Regression guard for the Patch handler.
+	code, pb := do(t, http.MethodPatch, base+"/v1/orgs/acme/servers/"+srv.ID, adminTok,
+		`{"allowed_roles":["aws-users"]}`)
+	if code != http.StatusOK {
+		t.Fatalf("patch: %d %s", code, pb)
+	}
+	var patched Server
+	_ = json.Unmarshal(pb, &patched)
+	if len(patched.AllowedRoles) != 1 || patched.AllowedRoles[0] != "aws-users" {
+		t.Fatalf("allowed_roles not applied in response: %+v", patched.AllowedRoles)
+	}
+	// And it must persist.
+	_, gb := do(t, http.MethodGet, base+"/v1/orgs/acme/servers/"+srv.ID, adminTok, "")
+	var got Server
+	_ = json.Unmarshal(gb, &got)
+	if len(got.AllowedRoles) != 1 || got.AllowedRoles[0] != "aws-users" {
+		t.Fatalf("allowed_roles not persisted: %+v", got.AllowedRoles)
+	}
+}
+
 func TestAdmin_HealthAuthFailed(t *testing.T) {
 	unauth := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
