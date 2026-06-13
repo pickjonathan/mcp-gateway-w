@@ -1,11 +1,13 @@
 <!-- SPECKIT START -->
-## Active feature: Multi-Tenant MCP Server Runtime (`001-mcp-server-runtime`)
+## Active feature: Admin Console UI — Carbon Design System (`002-admin-console`)
 
-Plan: `specs/001-mcp-server-runtime/plan.md` (see also `spec.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`).
+Plan: `specs/002-admin-console/plan.md` (see also `spec.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`).
 
-**Stack**: Go services (gateway / control-plane / sandbox-supervisor); Keycloak as per-org-realm OAuth 2.1 authorization server aligned to the MCP authorization spec (PKCE, dynamic client registration, audience-mapped scopes); Firecracker/Kata microVM sandboxes for stdio servers (gVisor for local); PostgreSQL + Redis + HashiCorp Vault; edge routing for `*.{base-domain}` (default `mcp.example.com`); OpenTelemetry.
+A **presentation-only admin console SPA** (React + TypeScript + Vite; Carbon Design System **vendored from the project-root handoff**; OAuth 2.1 + PKCE against the per-org Keycloak realm) that surfaces every admin-facing capability of `001-mcp-server-runtime` — server CRUD, write-only credentials, RBAC, audit, quotas/health — by consuming the existing control-plane API. **No new backend** (only CORS config). Lives under `web/admin-console/`.
 
-**Hard constraints (MUST)**: organization isolation, frictionless admin add, secure execution of *any* MCP (incl. untrusted code). **Soft (best-effort)**: user isolation, scale (100k users / 10k concurrent), performance, cost — may be traded off to uphold the hard constraints.
+**Builds on**: `001-mcp-server-runtime` (Go gateway / control-plane / sandbox-supervisor; Keycloak per-org realms; PostgreSQL + Redis + Vault; OpenTelemetry) — see `specs/001-mcp-server-runtime/`.
+
+**Hard constraints (MUST, inherited)**: organization isolation, secret confidentiality (secrets are write-only — never displayed/copied/logged), frictionless admin. The console MUST NOT weaken these for UX (Constitution IV).
 <!-- SPECKIT END -->
 
 ## Project overview

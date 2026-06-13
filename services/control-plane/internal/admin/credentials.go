@@ -39,6 +39,10 @@ func (h *Handlers) PutOrgCredentials(c echo.Context) error {
 	if err := h.secrets.Put(c.Request().Context(), secrets.OrgRef(org, id), v); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to store secret")
 	}
+	if !srv.CredentialSet { // record non-secret "is set" status for the admin console
+		srv.CredentialSet = true
+		_, _ = h.store.Update(srv)
+	}
 	h.record(c, "credentials.put", id, map[string]string{"scope": "org"}) // value never recorded
 	h.sink.CredentialChanged(srv, "")                                     // rotation applies on next instance start (T079)
 	return c.NoContent(http.StatusNoContent)                              // never echo the value
@@ -52,6 +56,8 @@ func (h *Handlers) DeleteOrgCredentials(c echo.Context) error {
 	}
 	h.record(c, "credentials.delete", id, map[string]string{"scope": "org"})
 	if srv, err := h.store.Get(org, id); err == nil {
+		srv.CredentialSet = false
+		_, _ = h.store.Update(srv)
 		h.sink.CredentialChanged(srv, "")
 	}
 	return c.NoContent(http.StatusNoContent)

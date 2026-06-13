@@ -5,6 +5,7 @@
     { file: "README.md", title: "Overview", html: "index.html" },
     { file: "architecture.md", title: "Architecture", html: "architecture.html" },
     { file: "features.md", title: "Features", html: "features.html" },
+    { file: "admin-console.md", title: "Admin Console (UI)", html: "admin-console.html" },
     { file: "security.md", title: "Security Model", html: "security.html" },
     { file: "observability.md", title: "Observability", html: "observability.html" },
     { file: "solution-comparison.md", title: "Solution Comparison", html: "solution-comparison.html" },

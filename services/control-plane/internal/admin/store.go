@@ -39,8 +39,12 @@ type Server struct {
 	Args           []string          `json:"args,omitempty"`
 	Env            map[string]string `json:"env,omitempty"`
 	CredentialMode string            `json:"credential_mode,omitempty"`
-	AllowedRoles   []string          `json:"allowed_roles,omitempty"`
-	Enabled        bool              `json:"enabled"`
+	// CredentialSet reports whether an org-shared credential is stored (non-secret
+	// status only — the value is never returned). Lets the admin console show
+	// set/not-set without reading secrets.
+	CredentialSet bool              `json:"credential_set"`
+	AllowedRoles  []string          `json:"allowed_roles,omitempty"`
+	Enabled       bool              `json:"enabled"`
 	Health         Health            `json:"health"`
 	HealthDetail   string            `json:"health_detail,omitempty"`
 	CreatedAt      time.Time         `json:"created_at"`

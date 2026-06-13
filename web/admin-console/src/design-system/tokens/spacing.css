@@ -1,0 +1,63 @@
+/* ============================================================
+   CARBON — SPACING, LAYOUT & SIZING TOKENS
+   The Carbon spacing scale, container sizes, fluid layout,
+   icon sizes, and the border-radius convention.
+   ============================================================ */
+
+:root {
+  /* ---------- Spacing scale (mini-unit = 8px base) ---------- */
+  --spacing-01: 0.125rem;  /* 2px  */
+  --spacing-02: 0.25rem;   /* 4px  */
+  --spacing-03: 0.5rem;    /* 8px  */
+  --spacing-04: 0.75rem;   /* 12px */
+  --spacing-05: 1rem;      /* 16px */
+  --spacing-06: 1.5rem;    /* 24px */
+  --spacing-07: 2rem;      /* 32px */
+  --spacing-08: 2.5rem;    /* 40px */
+  --spacing-09: 3rem;      /* 48px */
+  --spacing-10: 4rem;      /* 64px */
+  --spacing-11: 5rem;      /* 80px */
+  --spacing-12: 6rem;      /* 96px */
+  --spacing-13: 10rem;     /* 160px */
+
+  /* ---------- Container / control heights ---------- */
+  --container-01: 1.5rem;  /* 24px - sm field */
+  --container-02: 2rem;    /* 32px - field */
+  --container-03: 2.5rem;  /* 40px - md control (default) */
+  --container-04: 3rem;    /* 48px - lg control */
+  --container-05: 4rem;    /* 64px - xl control */
+
+  /* ---------- Icon sizes ---------- */
+  --icon-size-01: 1rem;     /* 16px */
+  --icon-size-02: 1.25rem;  /* 20px */
+
+  /* ---------- Fluid layout / margins ---------- */
+  --layout-01: 1rem;
+  --layout-02: 1.5rem;
+  --layout-03: 2rem;
+  --layout-04: 3rem;
+  --layout-05: 4rem;
+  --layout-06: 6rem;
+  --layout-07: 10rem;
+
+  /* ---------- Grid ---------- */
+  --grid-columns: 16; /* @kind other */
+  --grid-gutter: 2rem;        /* 32px */
+  --grid-margin: 1rem;        /* 16px */
+
+  /* ---------- Border radius ----------
+     Carbon is predominantly SHARP (0). A 4–8px radius is used
+     only on a few rounded surfaces (chat bubbles, pills, AI). */
+  --radius-none: 0;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-round: 50%;
+
+  /* ---------- Elevation (Carbon uses subtle, cool shadows) ---------- */
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.16);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.2);
+  --shadow-overlay: 0 16px 32px rgba(0, 0, 0, 0.2);
+}

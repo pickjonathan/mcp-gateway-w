@@ -1,0 +1,25 @@
+/* ============================================================
+   CARBON — MOTION TOKENS
+   Carbon's productive + expressive easing curves and the
+   standard duration scale. Motion is purposeful and quick.
+   ============================================================ */
+
+:root {
+  /* ---------- Durations ---------- */
+  --duration-fast-01: 70ms;      /* @kind other */ /* micro-interactions: hover, focus */
+  --duration-fast-02: 110ms;     /* @kind other */ /* small expansion, short fades */
+  --duration-moderate-01: 150ms; /* @kind other */ /* moderate expansion, slide */
+  --duration-moderate-02: 240ms; /* @kind other */ /* larger surfaces, dialogs */
+  --duration-slow-01: 400ms;     /* @kind other */ /* background dimming, large moves */
+  --duration-slow-02: 700ms;     /* @kind other */ /* very large / dramatic */
+
+  /* ---------- Easing — Productive (UI, efficient) ---------- */
+  --easing-standard-productive: cubic-bezier(0.2, 0, 0.38, 0.9); /* @kind other */
+  --easing-entrance-productive: cubic-bezier(0, 0, 0.38, 0.9);   /* @kind other */
+  --easing-exit-productive: cubic-bezier(0.2, 0, 1, 0.9);        /* @kind other */
+
+  /* ---------- Easing — Expressive (marketing, character) ---------- */
+  --easing-standard-expressive: cubic-bezier(0.4, 0.14, 0.3, 1); /* @kind other */
+  --easing-entrance-expressive: cubic-bezier(0, 0, 0.3, 1);      /* @kind other */
+  --easing-exit-expressive: cubic-bezier(0.4, 0.14, 1, 1);       /* @kind other */
+}
