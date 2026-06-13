@@ -24,10 +24,9 @@ describe('cross-org isolation (adversarial)', () => {
       }),
       http.get('/v1/orgs/:org/audit', ({ params }) => {
         seenOrgs.push(String(params.org))
-        return HttpResponse.json({
-          events: [{ seq: 1, time: '', actor: 'admin', action: 'server.create', target: 'acme-server' }],
-          chain: { status: 'verified' },
-        })
+        return HttpResponse.json([
+          { seq: 1, time: '', actor: 'admin', action: 'server.create', target: 'acme-server' },
+        ])
       }),
     )
 

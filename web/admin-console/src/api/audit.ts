@@ -10,16 +10,13 @@ export interface AuditEvent {
   metadata?: Record<string, string>
 }
 
-export type ChainStatus = 'verified' | 'tampered'
-
-export interface AuditResponse {
-  events: AuditEvent[]
-  chain: { status: ChainStatus }
-}
-
 export const auditKey = ['audit'] as const
 
-/** Fetch the org's audit events (newest-first) plus the chain-integrity status. */
+/**
+ * Fetch the org's audit events (newest-first). The control-plane returns a bare
+ * array of hash-chained records (`GET /v1/orgs/{org}/audit`); chain-integrity
+ * verification is not exposed as a field, so the client does not synthesize one.
+ */
 export function useAudit() {
-  return useQuery({ queryKey: auditKey, queryFn: () => api.get<AuditResponse>('/audit') })
+  return useQuery({ queryKey: auditKey, queryFn: () => api.get<AuditEvent[]>('/audit') })
 }

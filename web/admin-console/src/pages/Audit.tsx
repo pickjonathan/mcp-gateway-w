@@ -4,7 +4,6 @@ import { Search } from '../design-system/components/forms/Search'
 import { Select } from '../design-system/components/forms/Select'
 import { Tag } from '../design-system/components/core/Tag'
 import { Button } from '../design-system/components/core/Button'
-import { InlineNotification } from '../design-system/components/feedback/InlineNotification'
 import { Loading, ErrorState, EmptyState } from '../app/feedback/states'
 import { srOnly } from '../app/srOnly'
 
@@ -18,8 +17,7 @@ export function Audit() {
   const [filter, setFilter] = useState<'all' | 'denials'>('all')
   const [page, setPage] = useState(0)
 
-  const events = data?.events ?? []
-  const chain = data?.chain.status
+  const events = data ?? []
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -41,21 +39,9 @@ export function Audit() {
     <section>
       <h1 style={{ fontSize: 'var(--type-scale-06)', marginBottom: 'var(--spacing-05)' }}>Audit log</h1>
 
-      {chain === 'tampered' ? (
-        <InlineNotification
-          kind="error"
-          title="Integrity check failed"
-          subtitle="The audit chain may have been tampered with — investigate immediately."
-          hideClose
-        />
-      ) : (
-        <InlineNotification
-          kind="success"
-          title="Integrity verified"
-          subtitle="The audit chain is intact (tamper-evident)."
-          hideClose
-        />
-      )}
+      <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--type-scale-02)', marginBottom: 'var(--spacing-05)' }}>
+        Append-only, hash-chained audit log (newest first).
+      </p>
 
       <div style={{ display: 'flex', gap: 'var(--spacing-05)', alignItems: 'flex-end', margin: 'var(--spacing-05) 0' }}>
         <label style={{ flex: 1, maxWidth: 360 }}>

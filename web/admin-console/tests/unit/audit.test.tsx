@@ -7,14 +7,11 @@ import { Audit } from '../../src/pages/Audit'
 beforeEach(() => configureApi({ token: 'test', org: 'acme' }))
 
 describe('Audit log', () => {
-  it('shows the chain status, events, and filters to denials only', async () => {
+  it('shows events and filters to denials only', async () => {
     renderWithProviders(<Audit />)
 
-    // Chain-integrity banner.
-    expect(await screen.findByText('Integrity verified')).toBeInTheDocument()
-
     // Events from the fixture (a config action + a denial).
-    expect(screen.getByText('server.create')).toBeInTheDocument()
+    expect(await screen.findByText('server.create')).toBeInTheDocument()
     expect(screen.getByText('auth.denied')).toBeInTheDocument()
 
     // Filter to denials only → the non-denial action disappears.

@@ -1,4 +1,4 @@
-.PHONY: build run test vet lint tidy docker dev-up dev-down
+.PHONY: build run test vet lint tidy docker dev-up dev-down seed-keycloak
 BIN ?= bin/gateway
 
 build:
@@ -24,6 +24,11 @@ docker:
 
 dev-up:
 	docker compose -f deploy/dev/compose.yaml up -d
+	@bash deploy/dev/seed-keycloak.sh || echo "⚠ Keycloak seed failed — run 'make seed-keycloak' once it is ready."
 
 dev-down:
 	docker compose -f deploy/dev/compose.yaml down -v
+
+# Provision the dev Keycloak realm/client/user the admin console needs (idempotent).
+seed-keycloak:
+	@bash deploy/dev/seed-keycloak.sh

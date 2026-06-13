@@ -17,7 +17,7 @@ export function useDashboard() {
   const auditQ = useAudit()
 
   const servers = serversQ.data ?? []
-  const events = auditQ.data?.events ?? []
+  const events = auditQ.data ?? []
   const health = { healthy: 0, unhealthy: 0, unknown: 0 }
   for (const s of servers) health[s.health] += 1
 

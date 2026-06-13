@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mcp.example.com/schemas/mcp-servers.schema.json",
+  "title": "MCP servers configuration",
+  "description": "Standard mcpServers config consumed by the MCP admin console (Add server → Paste JSON). Mirrors src/features/servers/mcpConfig.ts.",
+  "type": "object",
+  "required": ["mcpServers"],
+  "additionalProperties": false,
+  "properties": {
+    "mcpServers": {
+      "type": "object",
+      "description": "Map of server name → server definition.",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "command": { "type": "string", "description": "Executable for a stdio (sandboxed) server, e.g. \"uvx\" or \"npx\"." },
+          "args": { "type": "array", "items": { "type": "string" }, "description": "Arguments passed to the command." },
+          "env": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "Environment variables. Stored as server config (visible to admins) — use the Credentials tab for secrets."
+          },
+          "url": { "type": "string", "description": "Endpoint URL for a remote (HTTP/SSE) server." },
+          "type": { "enum": ["stdio", "http", "sse"], "description": "Optional explicit transport. Inferred from command/url when omitted." },
+          "headers": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Headers for a remote server (not yet applied by the console)." },
+          "disabled": { "type": "boolean", "description": "When true the server is created disabled." },
+          "autoApprove": { "type": "array", "items": { "type": "string" }, "description": "Ignored — the gateway has no per-tool auto-approve." }
+        },
+        "oneOf": [{ "required": ["command"] }, { "required": ["url"] }]
+      }
+    }
+  }
+}

@@ -1,8 +1,17 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import type { User } from 'oidc-client-ts'
 import { createUserManager } from './oidc'
 import { resolveOrg } from './org'
-import { configureApi } from '../api/client'
+import { configureApi, type TokenProvider } from '../api/client'
 
 export interface Session {
   org: string
@@ -45,13 +54,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const mgr = useMemo(() => createUserManager(), [])
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const refreshing = useRef<Promise<User | null> | null>(null)
+
+  // Hand the API client a *fresh* token per request. The background renew timer
+  // (automaticSilentRenew) is throttled in inactive tabs, so a token can lapse
+  // before it fires; resolving the token on demand (and forcing a refresh on a
+  // 401 retry) closes that gap. Concurrent callers share one in-flight renew.
+  const getAccessToken = useCallback<TokenProvider>(
+    async (opts) => {
+      const user = await mgr.getUser()
+      if (!user) return null
+      const expiresIn = user.expires_in ?? 0
+      const stale = opts?.force || user.expired || expiresIn <= 30
+      if (!stale) return user.access_token
+      if (!refreshing.current) {
+        refreshing.current = mgr
+          .signinSilent()
+          .catch(() => null)
+          .finally(() => {
+            refreshing.current = null
+          })
+      }
+      const renewed = await refreshing.current
+      return renewed?.access_token ?? (user.expired ? null : user.access_token)
+    },
+    [mgr],
+  )
 
   useEffect(() => {
     let active = true
     const apply = (user: User | null) => {
       const next = user && !user.expired ? toSession(user) : null
       setSession(next)
-      configureApi({ token: next?.accessToken ?? null, org: next?.org ?? resolveOrg() })
+      configureApi({ org: next?.org ?? resolveOrg(), getToken: getAccessToken })
     }
     mgr
       .getUser()
@@ -72,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mgr.events.removeUserLoaded(onLoaded)
       mgr.events.removeUserUnloaded(onUnloaded)
     }
-  }, [mgr])
+  }, [mgr, getAccessToken])
 
   const value: AuthState = {
     session,
