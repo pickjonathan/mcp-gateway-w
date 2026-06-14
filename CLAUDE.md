@@ -8,6 +8,12 @@ A **presentation-only admin console SPA** (React + TypeScript + Vite; Carbon Des
 **Builds on**: `001-mcp-server-runtime` (Go gateway / control-plane / sandbox-supervisor; Keycloak per-org realms; PostgreSQL + Redis + Vault; OpenTelemetry) — see `specs/001-mcp-server-runtime/`.
 
 **Hard constraints (MUST, inherited)**: organization isolation, secret confidentiality (secrets are write-only — never displayed/copied/logged), frictionless admin. The console MUST NOT weaken these for UX (Constitution IV).
+
+### Planned: Automated Tenant Provisioning (`003-tenant-provisioning`)
+
+Plan: `specs/003-tenant-provisioning/plan.md` (see also `spec.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`). **Planned, not yet in implementation.**
+
+A **control-plane capability to provision/populate/deprovision isolated tenants**. A tenant **is** a Keycloak realm; bootstrap (Half A) uses the **Keycloak Admin API** (programmatic `seed-keycloak.sh`), and user provisioning (Half B) ships **invites + OIDC/SAML brokering + SCIM** in v1. Operator-initiated (self-service signup deferred); realm-per-tenant (tens–low-hundreds); delete purges identity/creds/servers but **retains WORM audit ≥ 1y** (Constitution VI). New control-plane packages (`tenants`, `idp`, `invites`, `scimbridge`) + a **platform realm/`platform-admin`** authz + a privileged Keycloak service-account credential in Vault. **Gateway unchanged** (org still derived from Host + issuer; suspend = realm-disable).
 <!-- SPECKIT END -->
 
 ## Project overview
