@@ -168,6 +168,93 @@ resource** — the OAuth **audience** the gateway requires and advertises (RFC 9
 - It must match the gateway's `MCP_RESOURCE_TEMPLATE` (dev `http://%s.mcp.example.com:8080/mcp`),
   and you need a hosts entry `127.0.0.1 {slug}.mcp.example.com` so the subdomain resolves.
 
+## Creating a tenant: API or manual realm import
+
+There are two ways to stand up a tenant realm:
+
+**A — Platform API (recommended).** `make provision-tenant` (or `POST /v1/platform/tenants`)
+runs the idempotent saga *and* records the control-plane rows — the `tenants`
+registry entry plus the org-scoped tables that enable invites / brokering / SCIM.
+It is audited, compensating, and keeps Keycloak and the control plane consistent.
+
+```sh
+make provision-tenant SLUG=globex NAME='Globex' ADMIN_EMAIL=ops@globex.example
+```
+
+**B — Manual Keycloak realm import.** For a hand-built realm, paste a
+realm-representation JSON into **Keycloak → Create realm → *Resource file*** (or
+`kcadm create realms -f realm.json`). This creates only the realm + clients + role
++ admin user — **not** the control-plane records — so prefer A unless you have a
+reason to build the realm by hand. The one per-tenant value that matters is the
+`mcp-client` audience mapper: `included.custom.audience` **must** equal the
+gateway's MCP resource for the slug — dev `http://{slug}.mcp.example.com:8080/mcp`.
+
+<details>
+<summary><strong>Realm JSON for manual import</strong> — replace <code>globex</code> with your slug (click to expand)</summary>
+
+```json
+{
+  "realm": "globex",
+  "enabled": true,
+  "sslRequired": "none",
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 28800,
+  "ssoSessionMaxLifespan": 86400,
+  "roles": { "realm": [ { "name": "admin" } ] },
+  "clients": [
+    {
+      "clientId": "mcp-admin-console",
+      "name": "MCP Admin Console",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "http://localhost:5173/*" },
+      "protocolMappers": [
+        { "name": "admin-api-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
+          "config": { "included.custom.audience": "https://api.mcp.example.com", "access.token.claim": "true", "id.token.claim": "false" } },
+        { "name": "realm-roles-id", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": { "claim.name": "realm_access.roles", "jsonType.label": "String", "multivalued": "true", "id.token.claim": "true", "access.token.claim": "true", "userinfo.token.claim": "true" } }
+      ]
+    },
+    {
+      "clientId": "mcp-client",
+      "name": "MCP Client",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:*", "http://127.0.0.1:*"],
+      "webOrigins": ["+"],
+      "attributes": { "pkce.code.challenge.method": "S256" },
+      "protocolMappers": [
+        { "name": "mcp-resource-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
+          "config": { "included.custom.audience": "http://globex.mcp.example.com:8080/mcp", "access.token.claim": "true", "id.token.claim": "false" } }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "ops@globex.example",
+      "email": "ops@globex.example",
+      "firstName": "Globex",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": ["admin"],
+      "credentials": [ { "type": "password", "value": "changeme", "temporary": true } ]
+    }
+  ]
+}
+```
+
+**Per tenant, change only** `realm` and the `mcp-resource-audience` value (both use the slug).
+**Dev → prod:** `sslRequired` → `external`, audience → `https://{slug}.mcp.example.com/mcp`
+(no `:8080`), and the console redirect/origins → your real console URL. The admin
+user needs `email`/`firstName`/`lastName` or login fails with *"Account is not fully set up."*
+
+</details>
+
 ## Run it locally
 
 ```sh
