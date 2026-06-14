@@ -67,6 +67,18 @@ func (v *JWTValidator) ValidateForOrg(ctx context.Context, raw, org, audience st
 	return v.verify(ctx, raw, org, audience)
 }
 
+// ValidateForRealm verifies a token issued by an explicit realm against the given
+// audience. Unlike ValidateForOrg, realm is not a tenant org slug — it names the
+// issuing realm directly (e.g. the platform realm for operator/cross-tenant APIs,
+// 003-tenant-provisioning). The returned Principal.OrgID carries that realm name;
+// callers gate on roles (e.g. platform-admin), not on org.
+func (v *JWTValidator) ValidateForRealm(ctx context.Context, raw, realm, audience string) (*Principal, error) {
+	if realm == "" {
+		return nil, ErrUnknownOrg
+	}
+	return v.verify(ctx, raw, realm, audience)
+}
+
 func (v *JWTValidator) verify(ctx context.Context, raw, org, audience string) (*Principal, error) {
 	wantIssuer := fmt.Sprintf(v.issuerTemplate, org)
 	keyfunc := func(t *jwt.Token) (interface{}, error) {

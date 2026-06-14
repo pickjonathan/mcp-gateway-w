@@ -5,7 +5,10 @@ package main
 import (
 	"context"
 	"os/signal"
+	"strings"
 	"syscall"
+
+	"github.com/labstack/echo/v4"
 
 	"github.com/acme-corp/mcp-runtime/pkg/audit"
 	"github.com/acme-corp/mcp-runtime/pkg/authz"
@@ -14,6 +17,10 @@ import (
 	"github.com/acme-corp/mcp-runtime/pkg/secrets"
 	"github.com/acme-corp/mcp-runtime/pkg/serverevents"
 	"github.com/acme-corp/mcp-runtime/services/control-plane/internal/admin"
+	"github.com/acme-corp/mcp-runtime/services/control-plane/internal/brokering"
+	"github.com/acme-corp/mcp-runtime/services/control-plane/internal/idp"
+	"github.com/acme-corp/mcp-runtime/services/control-plane/internal/invites"
+	"github.com/acme-corp/mcp-runtime/services/control-plane/internal/tenants"
 )
 
 func main() {
@@ -53,10 +60,108 @@ func main() {
 	}
 	api := admin.NewAPI(cfg, log, store, admin.NewBusSink(bus), sec, auditLog, validator)
 
+	// 003 tenant provisioning: platform-scoped tenant registry + operator API,
+	// mounted on the same server, authorized against the platform realm.
+	var tenantStore tenants.Store = tenants.NewMemStore()
+	if cfg.PostgresDSN != "" {
+		ts, err := tenants.NewPostgresStore(context.Background(), cfg.PostgresDSN)
+		if err != nil {
+			log.Fatal().Err(err).Msg("connect postgres (tenants)")
+		}
+		tenantStore = ts
+		log.Info().Msg("using postgres tenant store")
+	}
+	// The privileged Keycloak admin credential is resolved from the secret store
+	// (never read from env) and is held only here, never on the per-request path.
+	var kc idp.Keycloak
+	if cfg.KeycloakAdminClientID != "" {
+		secret := ""
+		if cfg.KeycloakAdminSecretRef != "" {
+			if vals, err := sec.Get(context.Background(), cfg.KeycloakAdminSecretRef); err == nil {
+				secret = vals["secret"]
+			} else {
+				log.Warn().Err(err).Msg("read keycloak admin secret ref")
+			}
+		}
+		kc = idp.NewRESTClient(cfg.KeycloakAdminURL, "master", cfg.KeycloakAdminClientID, secret)
+		log.Info().Str("url", cfg.KeycloakAdminURL).Msg("tenant provisioning enabled")
+	} else {
+		log.Info().Msg("tenant provisioning disabled (set MCP_KEYCLOAK_ADMIN_CLIENT_ID to enable)")
+	}
+	tenantSvc := tenants.NewService(tenantStore, kc, auditLog, log, tenants.Config{
+		BaseDomain:         cfg.BaseDomain,
+		ConsoleOrigin:      firstOrigin(cfg.ConsoleOrigins),
+		AdminAudience:      cfg.AdminAudience,
+		ResourceTemplate:   cfg.ResourceTemplate,
+		ReservedSlugs:      cfg.TenantReservedSlugs,
+		AuditRetentionDays: cfg.AuditRetentionDays,
+		Ceiling:            cfg.TenantCeiling,
+		AccessTTL:          900, SSOIdle: 28800, SSOMax: 86400,
+		SSLRequired: sslRequired(cfg),
+	})
+	tenantHandlers := tenants.NewHandlers(tenantSvc, tenantStore)
+	api.Mount(func(e *echo.Echo) {
+		tenants.RegisterRoutes(e, tenantHandlers, validator, cfg.PlatformRealm, cfg.PlatformAudience)
+	})
+
+	// US2 invitations: org-scoped invite management + public accept.
+	var inviteStore invites.Store = invites.NewMemStore()
+	if cfg.PostgresDSN != "" {
+		is, err := invites.NewPostgresStore(context.Background(), cfg.PostgresDSN)
+		if err != nil {
+			log.Fatal().Err(err).Msg("connect postgres (invites)")
+		}
+		inviteStore = is
+		log.Info().Msg("using postgres invitation store")
+	}
+	inviteHandlers := invites.NewHandlers(inviteStore, kc, auditLog, log, nil)
+	api.Mount(func(e *echo.Echo) {
+		invites.RegisterRoutes(e, inviteHandlers, validator, cfg.AdminAudience)
+	})
+
+	// US4 brokering: org-scoped SSO IdP configuration applied to the realm.
+	var brokerStore brokering.Store = brokering.NewMemStore()
+	if cfg.PostgresDSN != "" {
+		bs, err := brokering.NewPostgresStore(context.Background(), cfg.PostgresDSN)
+		if err != nil {
+			log.Fatal().Err(err).Msg("connect postgres (brokering)")
+		}
+		brokerStore = bs
+		log.Info().Msg("using postgres brokering store")
+	}
+	var broker idp.Broker
+	if rc, ok := kc.(*idp.RESTClient); ok {
+		broker = rc // the REST client implements both Keycloak and Broker
+	}
+	brokerHandlers := brokering.NewHandlers(brokerStore, broker, sec, auditLog)
+	api.Mount(func(e *echo.Echo) {
+		brokering.RegisterRoutes(e, brokerHandlers, validator, cfg.AdminAudience)
+	})
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	if err := api.Start(ctx); err != nil {
 		log.Fatal().Err(err).Msg("control-plane error")
 	}
 	log.Info().Msg("shutdown complete")
+}
+
+// firstOrigin returns the first non-empty CSV origin (the per-tenant console
+// redirect base), defaulting to the dev console URL.
+func firstOrigin(csv string) string {
+	for _, p := range strings.Split(csv, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			return p
+		}
+	}
+	return "http://localhost:5173"
+}
+
+// sslRequired is "external" in prod and "none" in dev (matching the seed script's
+// dev relaxation so http://localhost OIDC works).
+func sslRequired(cfg *config.Config) string {
+	if cfg.IsProd() {
+		return "external"
+	}
+	return "none"
 }

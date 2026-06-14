@@ -12,6 +12,20 @@ constitution Sync Impact Report states `/speckit-tasks` MUST emit contract + adv
 for any isolation/authz/secrets work — which is this entire feature. Adversarial/negative tests
 MUST be written and MUST FAIL before the implementation lands.
 
+> **Implementation progress (2026-06-14)** — `go build/vet/test ./...` green throughout.
+> **Done & tested:** Foundation (config, `authz.ValidateForRealm`, `idp` interface + in-house
+> `net/http` REST client, platform authz, wiring) · **US1** provision saga + compensation +
+> platform API (contract + adversarial: 403, no-ghost-realm, slug 409/422) · **US3**
+> suspend/resume/delete + audit retention ≥1y · **US2** invitations + public accept (no token
+> leak, expiry, cross-org isolation) · **US4 brokering** (OIDC/SAML config; secret→Vault, never
+> echoed). Audit (T011) inline via `record`; fixtures (T012) via fakes.
+> **Refinement:** Keycloak Admin integration is a thin in-house `net/http` client (`idp/rest.go`
+> + `brokering.go`) behind `idp.Keycloak`/`idp.Broker`, **not gocloak** (Principle VII); T001 superseded.
+> **Remaining for v1:** **US4 SCIM bridge** (T043 spike → T049/T050/T051 + scim_connections table +
+> T045/T047 tests) — the plan's highest-risk, spike-gated piece · T003 seed `PLATFORM=1` ·
+> T041 kill-switch server-events on delete · live `MCP_TEST_KEYCLOAK_*` integration (T018/T029/T037) ·
+> T025 Prometheus metrics · polish (T057–T062). US5 deferred.
+
 **Organization**: by user story (priority order from the clarified spec): US1 (P1) → US2/US3/US4
 (P2) → US5 (P3, **deferred from v1**).
 
@@ -34,10 +48,10 @@ behind `MCP_TEST_*` (new: `MCP_TEST_KEYCLOAK_URL`, `MCP_TEST_KEYCLOAK_ADMIN_*`) 
 
 **Purpose**: dependencies, config, dev-stack seeding, package scaffolding.
 
-- [ ] T001 Add the Keycloak Admin client dependency: `go get github.com/Nerzal/gocloak/v13` and `go mod tidy` (updates `go.mod`/`go.sum`)
-- [ ] T002 [P] Add tenant-provisioning config fields to `pkg/config/config.go` (`MCP_KEYCLOAK_ADMIN_URL`, `MCP_KEYCLOAK_ADMIN_CLIENT_ID`, `MCP_KEYCLOAK_ADMIN_SECRET_REF`, `MCP_PLATFORM_REALM`, `MCP_PLATFORM_AUDIENCE`, `MCP_TENANT_RESERVED_SLUGS`, `MCP_AUDIT_RETENTION_DAYS` default 365, `MCP_TENANT_CEILING` default 200) loaded via `config.Get()`
+- [~] T001 (superseded — in-house net/http client; no gocloak) Add the Keycloak Admin client dependency: `go get github.com/Nerzal/gocloak/v13` and `go mod tidy` (updates `go.mod`/`go.sum`)
+- [x] T002 [P] Add tenant-provisioning config fields to `pkg/config/config.go` (`MCP_KEYCLOAK_ADMIN_URL`, `MCP_KEYCLOAK_ADMIN_CLIENT_ID`, `MCP_KEYCLOAK_ADMIN_SECRET_REF`, `MCP_PLATFORM_REALM`, `MCP_PLATFORM_AUDIENCE`, `MCP_TENANT_RESERVED_SLUGS`, `MCP_AUDIT_RETENTION_DAYS` default 365, `MCP_TENANT_CEILING` default 200) loaded via `config.Get()`
 - [ ] T003 [P] Extend `deploy/dev/seed-keycloak.sh` with a `PLATFORM=1` path that seeds the `_platform` realm, the `platform-admin` role, an `mcp-platform` operator client, and the control-plane privileged **service-account** client (write its secret to Vault) — DEV ONLY, idempotent
-- [ ] T004 [P] Scaffold new packages with package docs: `services/control-plane/internal/tenants/doc.go`, `idp/doc.go`, `invites/doc.go`, `scimbridge/doc.go`
+- [x] T004 [P] Scaffold new packages with package docs: `services/control-plane/internal/tenants/doc.go`, `idp/doc.go`, `invites/doc.go`, `scimbridge/doc.go`
 
 ---
 
@@ -47,15 +61,15 @@ behind `MCP_TEST_*` (new: `MCP_TEST_KEYCLOAK_URL`, `MCP_TEST_KEYCLOAK_ADMIN_*`) 
 
 **⚠️ CRITICAL**: No user-story work begins until this phase is complete.
 
-- [ ] T005 DB migration for platform-scoped tables `tenants` + `provisioning_jobs` in `services/control-plane/internal/tenants/postgres.go` (follow the migration pattern in `services/control-plane/internal/admin/postgres.go`)
-- [ ] T006 [P] DB migration for org-scoped tables `invitations`, `idp_links`, `scim_connections` with **RLS** (`org_id = current_setting('app.current_org') OR = '*'`, `FORCE ROW LEVEL SECURITY`) in `services/control-plane/internal/{invites,idp,scimbridge}/postgres.go`
-- [ ] T007 [P] Define the `idp.Keycloak` interface (realm/client/mapper/role/user + IdP + enable/disable realm) in `services/control-plane/internal/idp/keycloak.go`
-- [ ] T008 Implement the gocloak-backed `idp.Keycloak` — admin token via client-credentials, secret read from Vault (`pkg/secrets`), never logged — in `services/control-plane/internal/idp/keycloak_gocloak.go` (depends on T001, T002, T007)
-- [ ] T009 [P] Add `ValidateForRealm(ctx, token, realm, audience)` to `pkg/authz/jwt.go` (fixed-realm validation for non-org-scoped callers; reuse JWKS path)
-- [ ] T010 [P] Implement `requirePlatformAdmin` middleware (validate platform-realm token + `platform-admin` role; sets principal) in `services/control-plane/internal/tenants/authz.go` (depends on T009)
-- [ ] T011 [P] Add audit action constants + helper for provisioning/lifecycle/user events (reuse `pkg/audit`) in `services/control-plane/internal/tenants/audit.go`
-- [ ] T012 [P] Test support: two-tenant fixtures + token-mint helpers (per-realm + platform) in `services/control-plane/internal/tenants/testsupport_test.go` (powers adversarial isolation tests)
-- [ ] T013 Base wiring in `services/control-plane/cmd/control-plane/main.go`: construct the idp client + stores, register the (initially empty) `/v1/platform`, tenant-admin, and SCIM-bridge route groups (depends on T005–T010)
+- [x] T005 DB migration for platform-scoped tables `tenants` + `provisioning_jobs` in `services/control-plane/internal/tenants/postgres.go` (follow the migration pattern in `services/control-plane/internal/admin/postgres.go`)
+- [~] T006 [P] DB migration for org-scoped tables `invitations`, `idp_links`, `scim_connections` with **RLS** (`org_id = current_setting('app.current_org') OR = '*'`, `FORCE ROW LEVEL SECURITY`) in `services/control-plane/internal/{invites,idp,scimbridge}/postgres.go`
+- [x] T007 [P] Define the `idp.Keycloak` interface (realm/client/mapper/role/user + IdP + enable/disable realm) in `services/control-plane/internal/idp/keycloak.go`
+- [x] T008 (done as in-house net/http RESTClient in `idp/rest.go`) Implement the gocloak-backed `idp.Keycloak` — admin token via client-credentials, secret read from Vault (`pkg/secrets`), never logged — in `services/control-plane/internal/idp/keycloak_gocloak.go` (depends on T001, T002, T007)
+- [x] T009 [P] Add `ValidateForRealm(ctx, token, realm, audience)` to `pkg/authz/jwt.go` (fixed-realm validation for non-org-scoped callers; reuse JWKS path)
+- [x] T010 [P] Implement `requirePlatformAdmin` middleware (validate platform-realm token + `platform-admin` role; sets principal) in `services/control-plane/internal/tenants/authz.go` (depends on T009)
+- [x] T011 [P] Add audit action constants + helper for provisioning/lifecycle/user events (reuse `pkg/audit`) in `services/control-plane/internal/tenants/audit.go`
+- [x] T012 [P] Test support: two-tenant fixtures + token-mint helpers (per-realm + platform) in `services/control-plane/internal/tenants/testsupport_test.go` (powers adversarial isolation tests)
+- [~] T013 (read routes mounted via api.Mount; mutating handlers land with US1/US3) Base wiring in `services/control-plane/cmd/control-plane/main.go`: construct the idp client + stores, register the (initially empty) `/v1/platform`, tenant-admin, and SCIM-bridge route groups (depends on T005–T010)
 
 **Checkpoint**: foundation ready — user stories can proceed (in parallel if staffed).
 
@@ -69,22 +83,22 @@ behind `MCP_TEST_*` (new: `MCP_TEST_KEYCLOAK_URL`, `MCP_TEST_KEYCLOAK_ADMIN_*`) 
 
 ### Tests for User Story 1 (write FIRST, must FAIL) ⚠️
 
-- [ ] T014 [P] [US1] Contract test for the platform API (POST/GET list/GET detail/GET jobs) with a mocked `idp.Keycloak` in `services/control-plane/internal/tenants/handlers_test.go` (per `contracts/platform-api.md`)
-- [ ] T015 [P] [US1] **Adversarial**: an org/tenant token → `403` on every `/v1/platform/*` route in `services/control-plane/internal/tenants/authz_test.go`
-- [ ] T016 [P] [US1] **Adversarial**: duplicate + reserved + malformed slug → `409`/`422` and **no** Keycloak object created (assert against mock) in `services/control-plane/internal/tenants/service_test.go`
-- [ ] T017 [P] [US1] **Adversarial**: inject a mid-saga failure (e.g. client step) → compensation runs, tenant ends `failed`, **no ghost realm**, re-run is idempotent (SC-003/008) in `services/control-plane/internal/tenants/service_compensation_test.go`
-- [ ] T018 [P] [US1] Integration (gated `MCP_TEST_KEYCLOAK_*`): provision a throwaway realm end-to-end and assert audience/issuer alignment per `contracts/keycloak-provisioning.md` in `services/control-plane/internal/idp/bootstrap_integration_test.go`
+- [x] T014 [P] [US1] Contract test for the platform API (POST/GET list/GET detail/GET jobs) with a mocked `idp.Keycloak` in `services/control-plane/internal/tenants/handlers_test.go` (per `contracts/platform-api.md`)
+- [x] T015 [P] [US1] **Adversarial**: an org/tenant token → `403` on every `/v1/platform/*` route in `services/control-plane/internal/tenants/authz_test.go`
+- [x] T016 [P] [US1] **Adversarial**: duplicate + reserved + malformed slug → `409`/`422` and **no** Keycloak object created (assert against mock) in `services/control-plane/internal/tenants/service_test.go`
+- [x] T017 [P] [US1] **Adversarial**: inject a mid-saga failure (e.g. client step) → compensation runs, tenant ends `failed`, **no ghost realm**, re-run is idempotent (SC-003/008) in `services/control-plane/internal/tenants/service_compensation_test.go`
+- [~] T018 [P] [US1] Integration (gated `MCP_TEST_KEYCLOAK_*`): provision a throwaway realm end-to-end and assert audience/issuer alignment per `contracts/keycloak-provisioning.md` in `services/control-plane/internal/idp/bootstrap_integration_test.go`
 
 ### Implementation for User Story 1
 
-- [ ] T019 [P] [US1] `Tenant` + `ProvisioningJob` models + status state machine in `services/control-plane/internal/tenants/model.go` (per data-model.md)
-- [ ] T020 [US1] Tenant store (CRUD + job tracking, platform-scoped `app.current_org='*'`) in `services/control-plane/internal/tenants/store.go` + `postgres.go` (depends on T005, T019)
-- [ ] T021 [P] [US1] Slug validation (format regex + reserved list + uniqueness) in `services/control-plane/internal/tenants/slug.go`
-- [ ] T022 [US1] Idempotent realm bootstrap (steps 1–7: realm, 2 clients, mappers, admin role, admin user) + per-step compensations in `services/control-plane/internal/idp/bootstrap.go` (depends on T008)
-- [ ] T023 [US1] Provision orchestration (saga: validate → bootstrap → persist; compensation on failure; resumable) in `services/control-plane/internal/tenants/service.go` (depends on T020, T021, T022)
-- [ ] T024 [US1] Platform API handlers (POST provision, GET list, GET detail, GET job) in `services/control-plane/internal/tenants/handlers.go`, mounted under `requirePlatformAdmin` (depends on T010, T023)
-- [ ] T025 [US1] Audit + metrics + observable provisioning status (FR-012/FR-025) wired into the service in `services/control-plane/internal/tenants/service.go`
-- [ ] T026 [US1] Realm-count ceiling warning (`MCP_TENANT_CEILING`, SC-009) in `services/control-plane/internal/tenants/service.go`
+- [x] T019 [P] [US1] `Tenant` + `ProvisioningJob` models + status state machine in `services/control-plane/internal/tenants/model.go` (per data-model.md)
+- [x] T020 [US1] Tenant store (CRUD + job tracking, platform-scoped `app.current_org='*'`) in `services/control-plane/internal/tenants/store.go` + `postgres.go` (depends on T005, T019)
+- [x] T021 [P] [US1] Slug validation (format regex + reserved list + uniqueness) in `services/control-plane/internal/tenants/slug.go`
+- [x] T022 [US1] Idempotent realm bootstrap (steps 1–7: realm, 2 clients, mappers, admin role, admin user) + per-step compensations in `services/control-plane/internal/idp/bootstrap.go` (depends on T008)
+- [x] T023 [US1] Provision orchestration (saga: validate → bootstrap → persist; compensation on failure; resumable) in `services/control-plane/internal/tenants/service.go` (depends on T020, T021, T022)
+- [x] T024 [US1] Platform API handlers (POST provision, GET list, GET detail, GET job) in `services/control-plane/internal/tenants/handlers.go`, mounted under `requirePlatformAdmin` (depends on T010, T023)
+- [~] T025 [US1] Audit + metrics + observable provisioning status (FR-012/FR-025) wired into the service in `services/control-plane/internal/tenants/service.go`
+- [x] T026 [US1] Realm-count ceiling warning (`MCP_TENANT_CEILING`, SC-009) in `services/control-plane/internal/tenants/service.go`
 
 **Checkpoint**: US1 fully functional — an operator can stand up an isolated tenant (MVP). Run the quickstart §1–§2 (provision + isolation gate).
 
@@ -98,18 +112,18 @@ behind `MCP_TEST_*` (new: `MCP_TEST_KEYCLOAK_URL`, `MCP_TEST_KEYCLOAK_ADMIN_*`) 
 
 ### Tests for User Story 2 (write FIRST, must FAIL) ⚠️
 
-- [ ] T027 [P] [US2] Contract test for invitations (POST/GET/DELETE + public accept) in `services/control-plane/internal/invites/handlers_test.go` (per `contracts/tenant-admin-api.md`)
-- [ ] T028 [P] [US2] **Adversarial**: an `acme` admin token cannot read/modify `globex` invitations (RLS + path binding); expired/revoked token → `410` in `services/control-plane/internal/invites/isolation_test.go`
-- [ ] T029 [P] [US2] Integration (gated): accept creates the user in the correct realm only with the assigned roles in `services/control-plane/internal/invites/accept_integration_test.go`
+- [x] T027 [P] [US2] Contract test for invitations (POST/GET/DELETE + public accept) in `services/control-plane/internal/invites/handlers_test.go` (per `contracts/tenant-admin-api.md`)
+- [x] T028 [P] [US2] **Adversarial**: an `acme` admin token cannot read/modify `globex` invitations (RLS + path binding); expired/revoked token → `410` in `services/control-plane/internal/invites/isolation_test.go`
+- [~] T029 [P] [US2] Integration (gated): accept creates the user in the correct realm only with the assigned roles in `services/control-plane/internal/invites/accept_integration_test.go`
 
 ### Implementation for User Story 2
 
-- [ ] T030 [P] [US2] `Invitation` model + store (org-scoped, RLS; token hash, status machine) in `services/control-plane/internal/invites/store.go` + `postgres.go` (depends on T006)
-- [ ] T031 [P] [US2] Single-use accept-token generation + hashing (raw token emailed once, never stored) in `services/control-plane/internal/invites/token.go`
-- [ ] T032 [US2] Invitation delivery: dev stub (log/audit the link) behind an interface for a real emailer later, in `services/control-plane/internal/invites/notify.go`
-- [ ] T033 [US2] `idp.CreateUserWithRoles(realm, email, roles)` in `services/control-plane/internal/idp/users.go` (depends on T008)
-- [ ] T034 [US2] Invitation handlers (POST/GET/DELETE under `requireAdmin`; public `POST /v1/invitations:accept`) in `services/control-plane/internal/invites/handlers.go` + register in `services/control-plane/internal/admin/api.go` (depends on T030–T033)
-- [ ] T035 [US2] Audit invite/accept/revoke events in `services/control-plane/internal/invites/handlers.go`
+- [x] T030 [P] [US2] `Invitation` model + store (org-scoped, RLS; token hash, status machine) in `services/control-plane/internal/invites/store.go` + `postgres.go` (depends on T006)
+- [x] T031 [P] [US2] Single-use accept-token generation + hashing (raw token emailed once, never stored) in `services/control-plane/internal/invites/token.go`
+- [x] T032 [US2] Invitation delivery: dev stub (log/audit the link) behind an interface for a real emailer later, in `services/control-plane/internal/invites/notify.go`
+- [x] T033 [US2] `idp.CreateUserWithRoles(realm, email, roles)` in `services/control-plane/internal/idp/users.go` (depends on T008)
+- [x] T034 [US2] Invitation handlers (POST/GET/DELETE under `requireAdmin`; public `POST /v1/invitations:accept`) in `services/control-plane/internal/invites/handlers.go` + register in `services/control-plane/internal/admin/api.go` (depends on T030–T033)
+- [x] T035 [US2] Audit invite/accept/revoke events in `services/control-plane/internal/invites/handlers.go`
 
 **Checkpoint**: US1 + US2 work independently — operators provision; admins populate via invites.
 
@@ -123,16 +137,16 @@ behind `MCP_TEST_*` (new: `MCP_TEST_KEYCLOAK_URL`, `MCP_TEST_KEYCLOAK_ADMIN_*`) 
 
 ### Tests for User Story 3 (write FIRST, must FAIL) ⚠️
 
-- [ ] T036 [P] [US3] Contract test for suspend/resume/delete in `services/control-plane/internal/tenants/lifecycle_test.go` (per `contracts/platform-api.md`)
-- [ ] T037 [P] [US3] **Adversarial** (gated): after suspend, a freshly minted globex token is rejected at the gateway while acme is unaffected (SC-006); after delete, the realm/clients are gone and the slug is reusable in `services/control-plane/internal/tenants/lifecycle_integration_test.go`
-- [ ] T038 [P] [US3] **Adversarial**: delete sets `audit_retention_until ≥ now+365d` and audit remains retrievable (Principle VI) in `services/control-plane/internal/tenants/retention_test.go`
+- [x] T036 [P] [US3] Contract test for suspend/resume/delete in `services/control-plane/internal/tenants/lifecycle_test.go` (per `contracts/platform-api.md`)
+- [~] T037 [P] [US3] **Adversarial** (gated): after suspend, a freshly minted globex token is rejected at the gateway while acme is unaffected (SC-006); after delete, the realm/clients are gone and the slug is reusable in `services/control-plane/internal/tenants/lifecycle_integration_test.go`
+- [x] T038 [P] [US3] **Adversarial**: delete sets `audit_retention_until ≥ now+365d` and audit remains retrievable (Principle VI) in `services/control-plane/internal/tenants/retention_test.go`
 
 ### Implementation for User Story 3
 
-- [ ] T039 [P] [US3] `idp.SetRealmEnabled(realm,bool)` + `idp.DeleteRealm(realm)` in `services/control-plane/internal/idp/lifecycle.go` (depends on T008)
-- [ ] T040 [US3] Suspend/resume service (realm disable/enable + status transitions + audit) in `services/control-plane/internal/tenants/service.go` (depends on T039)
-- [ ] T041 [US3] Delete saga: remove org server defs (emit existing `pkg/serverevents` removals → kill-switch parity, FR-021) → delete clients + realm → set `audit_retention_until` → schedule deferred audit purge, in `services/control-plane/internal/tenants/delete.go` (depends on T039, T020)
-- [ ] T042 [US3] Lifecycle handlers (`:suspend`, `:resume`, `DELETE`) in `services/control-plane/internal/tenants/handlers.go` (depends on T040, T041)
+- [x] T039 [P] [US3] `idp.SetRealmEnabled(realm,bool)` + `idp.DeleteRealm(realm)` in `services/control-plane/internal/idp/lifecycle.go` (depends on T008)
+- [x] T040 [US3] Suspend/resume service (realm disable/enable + status transitions + audit) in `services/control-plane/internal/tenants/service.go` (depends on T039)
+- [~] T041 [US3] Delete saga: remove org server defs (emit existing `pkg/serverevents` removals → kill-switch parity, FR-021) → delete clients + realm → set `audit_retention_until` → schedule deferred audit purge, in `services/control-plane/internal/tenants/delete.go` (depends on T039, T020)
+- [x] T042 [US3] Lifecycle handlers (`:suspend`, `:resume`, `DELETE`) in `services/control-plane/internal/tenants/handlers.go` (depends on T040, T041)
 
 **Checkpoint**: full tenant lifecycle (create → suspend/resume → delete) with isolation + retention guarantees.
 
@@ -147,19 +161,19 @@ behind `MCP_TEST_*` (new: `MCP_TEST_KEYCLOAK_URL`, `MCP_TEST_KEYCLOAK_ADMIN_*`) 
 ### Tests for User Story 4 (write FIRST, must FAIL) ⚠️
 
 - [ ] T043 [US4] **Spike** (research §6 risk): confirm the SCIM operation subset one real IdP (Okta/Entra) emits; record findings in `specs/003-tenant-provisioning/research.md` (gates T049/T050 scope)
-- [ ] T044 [P] [US4] Contract test for brokering config (`PUT/GET/DELETE identity-providers`) — secret never returned — in `services/control-plane/internal/idp/brokering_test.go`
+- [x] T044 [P] [US4] Contract test for brokering config (`PUT/GET/DELETE identity-providers`) — secret never returned — in `services/control-plane/internal/idp/brokering_test.go`
 - [ ] T045 [P] [US4] Contract test for `directory-sync` config (bearer shown once) + SCIM `Users`/`Groups`/`ServiceProviderConfig` in `services/control-plane/internal/scimbridge/server_test.go` (per `contracts/scim.md`)
-- [ ] T046 [P] [US4] **Adversarial**: a SCIM bearer for `acme` used on `globex`'s SCIM URL → `401`/`403`; brokered IdP secret never echoed in `services/control-plane/internal/scimbridge/isolation_test.go`
+- [~] T046 [P] [US4] **Adversarial**: a SCIM bearer for `acme` used on `globex`'s SCIM URL → `401`/`403`; brokered IdP secret never echoed in `services/control-plane/internal/scimbridge/isolation_test.go`
 - [ ] T047 [P] [US4] Integration (gated): SCIM `active:false` ⇒ user's next gateway token rejected (SC-005); group→role mapping yields the expected tools (RBAC parity) in `services/control-plane/internal/scimbridge/sync_integration_test.go`
 
 ### Implementation for User Story 4
 
-- [ ] T048 [P] [US4] `IdentityProviderLink` store + brokering config via Admin API (IdP + mappers, JIT) with the IdP secret in Vault, in `services/control-plane/internal/idp/brokering.go` + `store.go` (depends on T006, T008)
+- [x] T048 [P] [US4] `IdentityProviderLink` store + brokering config via Admin API (IdP + mappers, JIT) with the IdP secret in Vault, in `services/control-plane/internal/idp/brokering.go` + `store.go` (depends on T006, T008)
 - [ ] T049 [P] [US4] `DirectorySyncConnection` store + per-tenant SCIM bearer issuance/rotation (Vault, write-once) in `services/control-plane/internal/scimbridge/store.go` (depends on T006)
 - [ ] T050 [US4] SCIM 2.0 bridge server — `/Users` (POST/GET/PUT/PATCH incl. `active:false`), `/Groups`, discovery endpoints; Host→org + bearer auth; scoped to the T043 subset — in `services/control-plane/internal/scimbridge/server.go` (depends on T049)
 - [ ] T051 [US4] `scim_apply` translation to Admin API (user create/replace/disable, group→role) in `services/control-plane/internal/idp/scim_apply.go` (depends on T008, T050)
-- [ ] T052 [US4] Tenant-admin handlers (`PUT/GET/DELETE identity-providers`, `PUT/GET/:rotate/DELETE directory-sync`) under `requireAdmin` + register in `services/control-plane/internal/admin/api.go`; mount the SCIM bridge in `main.go` (depends on T048–T051)
-- [ ] T053 [US4] Audit brokering/SCIM config + sync events; record `last_sync_at` in `services/control-plane/internal/scimbridge/server.go`
+- [~] T052 [US4] Tenant-admin handlers (`PUT/GET/DELETE identity-providers`, `PUT/GET/:rotate/DELETE directory-sync`) under `requireAdmin` + register in `services/control-plane/internal/admin/api.go`; mount the SCIM bridge in `main.go` (depends on T048–T051)
+- [~] T053 [US4] Audit brokering/SCIM config + sync events; record `last_sync_at` in `services/control-plane/internal/scimbridge/server.go`
 
 **Checkpoint**: all three v1 user-provisioning mechanisms (invite + brokering + SCIM) work, each tenant-isolated.
 

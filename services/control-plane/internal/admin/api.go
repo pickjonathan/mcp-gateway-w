@@ -117,6 +117,12 @@ func (a *API) Start(ctx context.Context) error {
 	return err
 }
 
+// Mount lets callers register additional routes on the control-plane's Echo
+// instance before Start — e.g. the 003 tenant-provisioning platform API. The
+// global middleware (recover/CORS/tracing/metrics) registered in NewAPI also
+// applies to routes added here.
+func (a *API) Mount(register func(e *echo.Echo)) { register(a.e) }
+
 // requireAdmin validates the bearer token for the path org against the admin
 // audience and requires the "admin" role (HC-1: org from path, per-org realm).
 func requireAdmin(v authz.OrgValidator, audience string) echo.MiddlewareFunc {
