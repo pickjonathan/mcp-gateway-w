@@ -12,19 +12,20 @@ constitution Sync Impact Report states `/speckit-tasks` MUST emit contract + adv
 for any isolation/authz/secrets work — which is this entire feature. Adversarial/negative tests
 MUST be written and MUST FAIL before the implementation lands.
 
-> **Implementation progress (2026-06-14)** — `go build/vet/test ./...` green throughout.
-> **Done & tested:** Foundation (config, `authz.ValidateForRealm`, `idp` interface + in-house
-> `net/http` REST client, platform authz, wiring) · **US1** provision saga + compensation +
-> platform API (contract + adversarial: 403, no-ghost-realm, slug 409/422) · **US3**
-> suspend/resume/delete + audit retention ≥1y · **US2** invitations + public accept (no token
-> leak, expiry, cross-org isolation) · **US4 brokering** (OIDC/SAML config; secret→Vault, never
-> echoed). Audit (T011) inline via `record`; fixtures (T012) via fakes.
-> **Refinement:** Keycloak Admin integration is a thin in-house `net/http` client (`idp/rest.go`
-> + `brokering.go`) behind `idp.Keycloak`/`idp.Broker`, **not gocloak** (Principle VII); T001 superseded.
-> **Remaining for v1:** **US4 SCIM bridge** (T043 spike → T049/T050/T051 + scim_connections table +
-> T045/T047 tests) — the plan's highest-risk, spike-gated piece · T003 seed `PLATFORM=1` ·
-> T041 kill-switch server-events on delete · live `MCP_TEST_KEYCLOAK_*` integration (T018/T029/T037) ·
-> T025 Prometheus metrics · polish (T057–T062). US5 deferred.
+> **Implementation progress (2026-06-14)** — `go build/vet/test ./...` green; **US1–US4 implemented +
+> tested**, and **validated live** against the dev Keycloak: provision `smokeco` → `active` (realm + 2
+> clients + admin role + admin user created); suspend → `enabled=false`, resume → `enabled=true`;
+> delete → realm `404` with `audit_retention_until` = +1 year; an `acme` token → `401` on the platform API.
+> **Done & tested:** Foundation · **US1** provision saga + compensation + platform API · **US3**
+> suspend/resume/delete (+ audit ≥1y) · **US2** invitations + accept · **US4 brokering** + **US4 SCIM
+> bridge** (per-tenant bearer, Users create/replace, `PATCH active:false`→disable, group→role,
+> discovery) · **T003** seed `PLATFORM=1`. Adversarial: cross-tenant 403/401, no-ghost-realm
+> compensation, no-secret-leak, cross-org + SCIM-bearer isolation, retention.
+> **Refinement:** Keycloak Admin via in-house `net/http` client behind idp interfaces (not gocloak);
+> a 403-retry refreshes the admin token after realm creation (picks up the new realm's mgmt roles).
+> T001 superseded; dev-only `MCP_KEYCLOAK_ADMIN_SECRET` direct path (prod uses the Vault ref).
+> **Remaining for v1:** T041 kill-switch server-events on delete · live-gated `MCP_TEST_KEYCLOAK_*`
+> test *files* (T018/T029/T037/T047 — behaviour validated manually) · T025 metrics · polish (T057–T062). US5 deferred.
 
 **Organization**: by user story (priority order from the clarified spec): US1 (P1) → US2/US3/US4
 (P2) → US5 (P3, **deferred from v1**).
@@ -50,7 +51,7 @@ behind `MCP_TEST_*` (new: `MCP_TEST_KEYCLOAK_URL`, `MCP_TEST_KEYCLOAK_ADMIN_*`) 
 
 - [~] T001 (superseded — in-house net/http client; no gocloak) Add the Keycloak Admin client dependency: `go get github.com/Nerzal/gocloak/v13` and `go mod tidy` (updates `go.mod`/`go.sum`)
 - [x] T002 [P] Add tenant-provisioning config fields to `pkg/config/config.go` (`MCP_KEYCLOAK_ADMIN_URL`, `MCP_KEYCLOAK_ADMIN_CLIENT_ID`, `MCP_KEYCLOAK_ADMIN_SECRET_REF`, `MCP_PLATFORM_REALM`, `MCP_PLATFORM_AUDIENCE`, `MCP_TENANT_RESERVED_SLUGS`, `MCP_AUDIT_RETENTION_DAYS` default 365, `MCP_TENANT_CEILING` default 200) loaded via `config.Get()`
-- [ ] T003 [P] Extend `deploy/dev/seed-keycloak.sh` with a `PLATFORM=1` path that seeds the `_platform` realm, the `platform-admin` role, an `mcp-platform` operator client, and the control-plane privileged **service-account** client (write its secret to Vault) — DEV ONLY, idempotent
+- [x] T003 [P] Extend `deploy/dev/seed-keycloak.sh` with a `PLATFORM=1` path that seeds the `_platform` realm, the `platform-admin` role, an `mcp-platform` operator client, and the control-plane privileged **service-account** client (write its secret to Vault) — DEV ONLY, idempotent
 - [x] T004 [P] Scaffold new packages with package docs: `services/control-plane/internal/tenants/doc.go`, `idp/doc.go`, `invites/doc.go`, `scimbridge/doc.go`
 
 ---
@@ -160,20 +161,20 @@ behind `MCP_TEST_*` (new: `MCP_TEST_KEYCLOAK_URL`, `MCP_TEST_KEYCLOAK_ADMIN_*`) 
 
 ### Tests for User Story 4 (write FIRST, must FAIL) ⚠️
 
-- [ ] T043 [US4] **Spike** (research §6 risk): confirm the SCIM operation subset one real IdP (Okta/Entra) emits; record findings in `specs/003-tenant-provisioning/research.md` (gates T049/T050 scope)
+- [x] T043 [US4] **Spike** (research §6 risk): confirm the SCIM operation subset one real IdP (Okta/Entra) emits; record findings in `specs/003-tenant-provisioning/research.md` (gates T049/T050 scope)
 - [x] T044 [P] [US4] Contract test for brokering config (`PUT/GET/DELETE identity-providers`) — secret never returned — in `services/control-plane/internal/idp/brokering_test.go`
-- [ ] T045 [P] [US4] Contract test for `directory-sync` config (bearer shown once) + SCIM `Users`/`Groups`/`ServiceProviderConfig` in `services/control-plane/internal/scimbridge/server_test.go` (per `contracts/scim.md`)
-- [~] T046 [P] [US4] **Adversarial**: a SCIM bearer for `acme` used on `globex`'s SCIM URL → `401`/`403`; brokered IdP secret never echoed in `services/control-plane/internal/scimbridge/isolation_test.go`
-- [ ] T047 [P] [US4] Integration (gated): SCIM `active:false` ⇒ user's next gateway token rejected (SC-005); group→role mapping yields the expected tools (RBAC parity) in `services/control-plane/internal/scimbridge/sync_integration_test.go`
+- [x] T045 [P] [US4] Contract test for `directory-sync` config (bearer shown once) + SCIM `Users`/`Groups`/`ServiceProviderConfig` in `services/control-plane/internal/scimbridge/server_test.go` (per `contracts/scim.md`)
+- [x] T046 [P] [US4] **Adversarial**: a SCIM bearer for `acme` used on `globex`'s SCIM URL → `401`/`403`; brokered IdP secret never echoed in `services/control-plane/internal/scimbridge/isolation_test.go`
+- [~] T047 [P] [US4] Integration (gated): SCIM `active:false` ⇒ user's next gateway token rejected (SC-005); group→role mapping yields the expected tools (RBAC parity) in `services/control-plane/internal/scimbridge/sync_integration_test.go`
 
 ### Implementation for User Story 4
 
 - [x] T048 [P] [US4] `IdentityProviderLink` store + brokering config via Admin API (IdP + mappers, JIT) with the IdP secret in Vault, in `services/control-plane/internal/idp/brokering.go` + `store.go` (depends on T006, T008)
-- [ ] T049 [P] [US4] `DirectorySyncConnection` store + per-tenant SCIM bearer issuance/rotation (Vault, write-once) in `services/control-plane/internal/scimbridge/store.go` (depends on T006)
-- [ ] T050 [US4] SCIM 2.0 bridge server — `/Users` (POST/GET/PUT/PATCH incl. `active:false`), `/Groups`, discovery endpoints; Host→org + bearer auth; scoped to the T043 subset — in `services/control-plane/internal/scimbridge/server.go` (depends on T049)
-- [ ] T051 [US4] `scim_apply` translation to Admin API (user create/replace/disable, group→role) in `services/control-plane/internal/idp/scim_apply.go` (depends on T008, T050)
-- [~] T052 [US4] Tenant-admin handlers (`PUT/GET/DELETE identity-providers`, `PUT/GET/:rotate/DELETE directory-sync`) under `requireAdmin` + register in `services/control-plane/internal/admin/api.go`; mount the SCIM bridge in `main.go` (depends on T048–T051)
-- [~] T053 [US4] Audit brokering/SCIM config + sync events; record `last_sync_at` in `services/control-plane/internal/scimbridge/server.go`
+- [x] T049 [P] [US4] `DirectorySyncConnection` store + per-tenant SCIM bearer issuance/rotation (Vault, write-once) in `services/control-plane/internal/scimbridge/store.go` (depends on T006)
+- [x] T050 [US4] SCIM 2.0 bridge server — `/Users` (POST/GET/PUT/PATCH incl. `active:false`), `/Groups`, discovery endpoints; Host→org + bearer auth; scoped to the T043 subset — in `services/control-plane/internal/scimbridge/server.go` (depends on T049)
+- [x] T051 [US4] `scim_apply` translation to Admin API (user create/replace/disable, group→role) in `services/control-plane/internal/idp/scim_apply.go` (depends on T008, T050)
+- [x] T052 [US4] Tenant-admin handlers (`PUT/GET/DELETE identity-providers`, `PUT/GET/:rotate/DELETE directory-sync`) under `requireAdmin` + register in `services/control-plane/internal/admin/api.go`; mount the SCIM bridge in `main.go` (depends on T048–T051)
+- [x] T053 [US4] Audit brokering/SCIM config + sync events; record `last_sync_at` in `services/control-plane/internal/scimbridge/server.go`
 
 **Checkpoint**: all three v1 user-provisioning mechanisms (invite + brokering + SCIM) work, each tenant-isolated.
 
@@ -194,7 +195,7 @@ implement in v1. Reuses the US1 provisioning saga behind end-user guardrails.
 
 - [ ] T057 [P] Update docs: `docs/multi-tenant-keycloak.md` + `docs/implementation.md` (tenant lifecycle) + README "Run it locally" (provisioning a 2nd tenant)
 - [ ] T058 [P] Add `make provision-tenant SLUG=… NAME=… ADMIN_EMAIL=…` convenience target wrapping the platform API
-- [ ] T059 Run the `quickstart.md` isolation walkthrough end-to-end — the **release acceptance gate** (Constitution) — and check off its acceptance list
+- [~] T059 Run the `quickstart.md` isolation walkthrough end-to-end — the **release acceptance gate** (Constitution) — and check off its acceptance list
 - [ ] T060 Security hardening pass: assert the privileged Keycloak credential + SCIM bearers + IdP secrets never appear in any API response, log, or trace (grep + a redaction test)
 - [ ] T061 [P] Performance validation: provision <5min (SC-001), suspend propagation <1min (SC-006), SCIM deactivation ≤15min (SC-005)
 - [ ] T062 Final `go build ./... && go vet ./... && go test ./...` green; integration suite green against the dev stack with `MCP_TEST_*` set

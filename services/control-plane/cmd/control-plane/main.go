@@ -20,6 +20,7 @@ import (
 	"github.com/acme-corp/mcp-runtime/services/control-plane/internal/brokering"
 	"github.com/acme-corp/mcp-runtime/services/control-plane/internal/idp"
 	"github.com/acme-corp/mcp-runtime/services/control-plane/internal/invites"
+	"github.com/acme-corp/mcp-runtime/services/control-plane/internal/scimbridge"
 	"github.com/acme-corp/mcp-runtime/services/control-plane/internal/tenants"
 )
 
@@ -75,8 +76,8 @@ func main() {
 	// (never read from env) and is held only here, never on the per-request path.
 	var kc idp.Keycloak
 	if cfg.KeycloakAdminClientID != "" {
-		secret := ""
-		if cfg.KeycloakAdminSecretRef != "" {
+		secret := cfg.KeycloakAdminSecret // dev direct secret
+		if secret == "" && cfg.KeycloakAdminSecretRef != "" {
 			if vals, err := sec.Get(context.Background(), cfg.KeycloakAdminSecretRef); err == nil {
 				secret = vals["secret"]
 			} else {
@@ -136,6 +137,26 @@ func main() {
 	brokerHandlers := brokering.NewHandlers(brokerStore, broker, sec, auditLog)
 	api.Mount(func(e *echo.Echo) {
 		brokering.RegisterRoutes(e, brokerHandlers, validator, cfg.AdminAudience)
+	})
+
+	// US4 SCIM directory sync: per-tenant bearer + Keycloak apply (deactivation
+	// removes gateway access by next token).
+	var scimStore scimbridge.Store = scimbridge.NewMemStore()
+	if cfg.PostgresDSN != "" {
+		ss, err := scimbridge.NewPostgresStore(context.Background(), cfg.PostgresDSN)
+		if err != nil {
+			log.Fatal().Err(err).Msg("connect postgres (scim)")
+		}
+		scimStore = ss
+		log.Info().Msg("using postgres scim store")
+	}
+	var dir idp.Directory
+	if rc, ok := kc.(*idp.RESTClient); ok {
+		dir = rc
+	}
+	scimHandlers := scimbridge.NewHandlers(scimStore, dir, auditLog, cfg.BaseDomain)
+	api.Mount(func(e *echo.Echo) {
+		scimbridge.RegisterRoutes(e, scimHandlers, validator, cfg.AdminAudience)
 	})
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

@@ -89,6 +89,7 @@ type Config struct {
 	KeycloakAdminURL       string // Keycloak base URL for the Admin API (e.g. http://localhost:8081)
 	KeycloakAdminClientID  string // privileged service-account client id
 	KeycloakAdminSecretRef string // secret-store ref holding {"secret": "..."}; never the value
+	KeycloakAdminSecret    string // DEV ONLY: direct secret (prod MUST use KeycloakAdminSecretRef -> Vault)
 	// Operator (platform) APIs authenticate against a dedicated platform realm,
 	// distinct from any tenant org — see authz.ValidateForRealm.
 	PlatformRealm    string // realm issuing operator tokens (default _platform)
@@ -150,6 +151,7 @@ func load() *Config {
 		KeycloakAdminURL:       getEnv("MCP_KEYCLOAK_ADMIN_URL", "http://localhost:8081"),
 		KeycloakAdminClientID:  getEnv("MCP_KEYCLOAK_ADMIN_CLIENT_ID", ""),
 		KeycloakAdminSecretRef: getEnv("MCP_KEYCLOAK_ADMIN_SECRET_REF", ""),
+		KeycloakAdminSecret:    getEnv("MCP_KEYCLOAK_ADMIN_SECRET", ""),
 		PlatformRealm:          getEnv("MCP_PLATFORM_REALM", "_platform"),
 		PlatformAudience:       getEnv("MCP_PLATFORM_AUDIENCE", ""),
 		TenantReservedSlugs:    getEnv("MCP_TENANT_RESERVED_SLUGS", "www,api,admin,auth,app"),

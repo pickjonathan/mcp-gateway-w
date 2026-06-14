@@ -85,8 +85,34 @@ func (c *RESTClient) accessToken(ctx context.Context) (string, error) {
 	return c.token, nil
 }
 
-// do performs an authenticated Admin API request; body is JSON-encoded if non-nil.
+// invalidate clears the cached admin token so the next call re-mints one. Used
+// after creating a realm: Keycloak adds that realm's management roles to the
+// service account's (master admin) composite, but a token minted earlier won't
+// carry them — so the next management call would 403 until a fresh token is issued.
+func (c *RESTClient) invalidate() {
+	c.mu.Lock()
+	c.token, c.exp = "", time.Time{}
+	c.mu.Unlock()
+}
+
+// do performs an authenticated Admin API request, retrying once with a fresh token
+// on 403 (handles newly-granted per-realm management roles not yet in the token).
 func (c *RESTClient) do(ctx context.Context, method, path string, body any) (*http.Response, error) {
+	resp, err := c.doOnce(ctx, method, path, body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode == http.StatusForbidden {
+		resp.Body.Close()
+		c.invalidate()
+		return c.doOnce(ctx, method, path, body)
+	}
+	return resp, nil
+}
+
+// doOnce performs a single authenticated Admin API request; body is JSON-encoded
+// if non-nil.
+func (c *RESTClient) doOnce(ctx context.Context, method, path string, body any) (*http.Response, error) {
 	tok, err := c.accessToken(ctx)
 	if err != nil {
 		return nil, err
