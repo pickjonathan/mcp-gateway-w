@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { Button } from '../../design-system/components/core/Button'
 import { useSession } from '../../auth/AuthProvider'
+import { isDevHost, clearDevOrg } from '../../auth/org'
 
 const NAV = [
   { to: '/', label: 'Dashboard', end: true },
@@ -38,6 +39,18 @@ export function AppShell() {
         </strong>
         <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-04)' }}>
           <span style={{ fontSize: 'var(--type-scale-02)' }}>{session?.displayName}</span>
+          {isDevHost() && (
+            <Button
+              kind="ghost"
+              size="sm"
+              onClick={() => {
+                clearDevOrg()
+                window.location.reload()
+              }}
+            >
+              Switch org
+            </Button>
+          )}
           <Button kind="ghost" size="sm" onClick={() => void signOut()}>
             Sign out
           </Button>
