@@ -91,6 +91,7 @@ Full docs live in [`docs/`](docs/) and render as a small site:
 | [Local gVisor Sandbox](docs/local-sandbox.md) | The HC-3 boundary locally |
 | [Multi-tenant (Keycloak)](docs/multi-tenant-keycloak.md) | Realm-per-org, onboarding, MCP scopes, roles, invites |
 | [MCP Clients & RBAC](docs/mcp-inspector-rbac.md) | Connect the Inspector/clients; validate per-user tool access |
+| [Isolation Proof](docs/isolation-proof.md) | Two-tenant AWS-MCP end-to-end isolation proof (gVisor, ministack, stress) |
 
 ### Viewing the docs site
 

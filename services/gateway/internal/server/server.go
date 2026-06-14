@@ -60,7 +60,7 @@ func New(cfg *config.Config, log zerolog.Logger) *Server {
 	s := &Server{
 		e: e, cfg: cfg, log: log,
 		catalog:     cat,
-		runtime:     sandbox.Select(cfg.SandboxRuntime, cfg.SandboxImage, log),
+		runtime:     sandbox.Select(cfg.SandboxRuntime, cfg.SandboxImage, cfg.SandboxEgressNetwork, log),
 		secrets:     sec,
 		audit:       buildAuditLogger(cfg, log),
 		redis:       rdb,
