@@ -29,6 +29,27 @@ cd web/admin-console && npm install && npm run dev   # admin console on :5173
 These run your local code against the stack with the right dev env baked in
 (local Keycloak issuer, traces → Jaeger). `make run` is an alias for `run-gateway`.
 
+### 2b · Provision an isolated tenant (`003-tenant-provisioning`)
+
+Onboard a new company as its own Keycloak realm from the control plane:
+
+```sh
+make seed-platform        # _platform realm + operator + provisioner service account (prints the secret)
+
+# run the control-plane with provisioning enabled (paste the printed secret):
+MCP_KEYCLOAK_ADMIN_CLIENT_ID=mcp-provisioner MCP_KEYCLOAK_ADMIN_SECRET=<printed> \
+MCP_KEYCLOAK_ADMIN_URL=http://localhost:8081 MCP_PLATFORM_REALM=_platform \
+MCP_PLATFORM_AUDIENCE=https://platform.mcp.example.com  make run-control-plane
+
+make provision-tenant SLUG=globex NAME='Globex' ADMIN_EMAIL=ops@globex.example
+echo "127.0.0.1 globex.mcp.example.com" | sudo tee -a /etc/hosts   # so the subdomain resolves
+```
+
+Operator login: `operator`/`operator` (the `_platform` realm). The new tenant's MCP
+resource (token audience) is `http://globex.mcp.example.com:8080/mcp` — set
+automatically on its `mcp-client`. Full flows (provision saga, lifecycle, invites /
+brokering / SCIM, isolation) are in **[docs/tenant-provisioning.md](docs/tenant-provisioning.md)**.
+
 ### 3 · Open everything
 
 | UI | URL | Login |
