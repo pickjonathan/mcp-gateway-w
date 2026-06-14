@@ -13,6 +13,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/otel"
 	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
@@ -43,6 +44,10 @@ func NewMetrics(service string) (*Metrics, error) {
 		return nil, err
 	}
 	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(exporter))
+	// Register as the global meter provider so packages using the global meter
+	// (e.g. tenant provisioning counters) export on this service's /metrics. Each
+	// service is its own process, so there is no cross-service collision.
+	otel.SetMeterProvider(provider)
 	meter := provider.Meter(service)
 
 	requests, err := meter.Int64Counter(

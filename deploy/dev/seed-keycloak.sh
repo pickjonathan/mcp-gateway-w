@@ -166,3 +166,78 @@ echo "  user $ADMIN_USER: password set + admin role assigned"
 
 echo "✅ Keycloak seeded: realm=$REALM, login=$ADMIN_USER/$ADMIN_PW, console=$CLIENT_ID, mcp=$MCP_CLIENT_ID, TTL=${ACCESS_TTL}s"
 KCADM
+
+# --- Platform realm + provisioner service account (PLATFORM=1, DEV ONLY) ---
+# Seeds the operator + control-plane identity for 003-tenant-provisioning:
+#   * realm `_platform` with role `platform-admin`
+#   * public client `mcp-platform` (direct grants) + operator/operator user
+#   * master confidential client `mcp-provisioner` whose service account is master
+#     admin (DEV shortcut) — the control plane uses it to create realms.
+# Prints the provisioner secret to export as MCP_KEYCLOAK_ADMIN_SECRET.
+if [ -n "${PLATFORM:-}" ]; then
+  echo "Seeding platform realm (PLATFORM=1) — DEV ONLY…"
+  docker compose -f "$COMPOSE" exec -T \
+    -e PLATFORM_REALM="${PLATFORM_REALM:-_platform}" \
+    -e PLATFORM_AUDIENCE="${PLATFORM_AUDIENCE:-https://platform.mcp.example.com}" \
+    -e PROVISIONER_ID="${PROVISIONER_ID:-mcp-provisioner}" \
+    -e OPERATOR_USER="${OPERATOR_USER:-operator}" -e OPERATOR_PW="${OPERATOR_PW:-operator}" \
+    -e KC_ADMIN="$KC_ADMIN" -e KC_ADMIN_PW="$KC_ADMIN_PW" -e ACCESS_TTL="$ACCESS_TTL" \
+    keycloak bash -s <<'KCADM2'
+set -euo pipefail
+K=/opt/keycloak/bin/kcadm.sh
+$K config credentials --server http://localhost:8080 --realm master --user "$KC_ADMIN" --password "$KC_ADMIN_PW" >/dev/null
+
+if $K get "realms/$PLATFORM_REALM" >/dev/null 2>&1; then
+  $K update "realms/$PLATFORM_REALM" -s enabled=true -s sslRequired=NONE -s accessTokenLifespan=$ACCESS_TTL
+else
+  $K create realms -s "realm=$PLATFORM_REALM" -s enabled=true -s sslRequired=NONE -s accessTokenLifespan=$ACCESS_TTL
+fi
+$K get "roles/platform-admin" -r "$PLATFORM_REALM" >/dev/null 2>&1 || $K create roles -r "$PLATFORM_REALM" -s name=platform-admin
+echo "  platform realm + platform-admin role: ok"
+
+PCID=$($K get clients -r "$PLATFORM_REALM" -q "clientId=mcp-platform" --fields id --format csv --noquotes 2>/dev/null | tr -d '\r')
+if [ -z "$PCID" ]; then
+  $K create clients -r "$PLATFORM_REALM" -s clientId=mcp-platform -s name='MCP Platform' \
+    -s publicClient=true -s standardFlowEnabled=true -s directAccessGrantsEnabled=true \
+    -s 'redirectUris=["http://localhost:*"]' -s 'webOrigins=["+"]' \
+    -s 'attributes={"pkce.code.challenge.method":"S256"}'
+  PCID=$($K get clients -r "$PLATFORM_REALM" -q "clientId=mcp-platform" --fields id --format csv --noquotes | tr -d '\r')
+fi
+PMAP=$($K get "clients/$PCID/protocol-mappers/models" -r "$PLATFORM_REALM" --fields name --format csv --noquotes 2>/dev/null | tr -d '\r')
+case "$PMAP" in *platform-audience*) : ;; *) $K create "clients/$PCID/protocol-mappers/models" -r "$PLATFORM_REALM" \
+  -s name=platform-audience -s protocol=openid-connect -s protocolMapper=oidc-audience-mapper \
+  -s "config.\"included.custom.audience\"=$PLATFORM_AUDIENCE" -s 'config."access.token.claim"=true' -s 'config."id.token.claim"=false' ;; esac
+case "$PMAP" in *platform-roles*) : ;; *) $K create "clients/$PCID/protocol-mappers/models" -r "$PLATFORM_REALM" \
+  -s name=platform-roles -s protocol=openid-connect -s protocolMapper=oidc-usermodel-realm-role-mapper \
+  -s 'config."claim.name"=realm_access.roles' -s 'config.multivalued=true' -s 'config."jsonType.label"=String' \
+  -s 'config."access.token.claim"=true' -s 'config."id.token.claim"=true' ;; esac
+echo "  client mcp-platform + mappers: ok"
+
+OID=$($K get users -r "$PLATFORM_REALM" -q "username=$OPERATOR_USER" --fields id --format csv --noquotes 2>/dev/null | head -1 | tr -d '\r')
+[ -n "$OID" ] || $K create users -r "$PLATFORM_REALM" -s "username=$OPERATOR_USER" -s enabled=true \
+  -s emailVerified=true -s "email=$OPERATOR_USER@platform.test" -s firstName=Platform -s lastName=Operator
+$K set-password -r "$PLATFORM_REALM" --username "$OPERATOR_USER" --new-password "$OPERATOR_PW"
+# Clear any required action (e.g. UPDATE_PASSWORD) and ensure the user-profile
+# fields are present, else password grant fails with "Account is not fully set up".
+OID=$($K get users -r "$PLATFORM_REALM" -q "username=$OPERATOR_USER" --fields id --format csv --noquotes 2>/dev/null | head -1 | tr -d "\r")
+$K update "users/$OID" -r "$PLATFORM_REALM" -s "requiredActions=[]" 2>/dev/null || true
+$K add-roles -r "$PLATFORM_REALM" --uusername "$OPERATOR_USER" --rolename platform-admin 2>/dev/null || true
+echo "  operator $OPERATOR_USER/$OPERATOR_PW: ok"
+
+RID=$($K get clients -r master -q "clientId=$PROVISIONER_ID" --fields id --format csv --noquotes 2>/dev/null | tr -d '\r')
+if [ -z "$RID" ]; then
+  $K create clients -r master -s clientId=$PROVISIONER_ID -s enabled=true -s publicClient=false \
+    -s serviceAccountsEnabled=true -s standardFlowEnabled=false -s directAccessGrantsEnabled=false
+  RID=$($K get clients -r master -q "clientId=$PROVISIONER_ID" --fields id --format csv --noquotes | tr -d '\r')
+fi
+$K add-roles -r master --uusername "service-account-$PROVISIONER_ID" --rolename admin 2>/dev/null || true
+SECRET=$($K get "clients/$RID/client-secret" -r master --fields value --format csv --noquotes 2>/dev/null | tr -d '\r')
+echo "  provisioner $PROVISIONER_ID: ready (service account = master admin, DEV)"
+echo ""
+echo "  Export to enable provisioning in the control-plane (DEV):"
+echo "    MCP_KEYCLOAK_ADMIN_URL=http://localhost:8081 MCP_KEYCLOAK_ADMIN_CLIENT_ID=$PROVISIONER_ID \\"
+echo "    MCP_KEYCLOAK_ADMIN_SECRET=$SECRET \\"
+echo "    MCP_PLATFORM_REALM=$PLATFORM_REALM MCP_PLATFORM_AUDIENCE=$PLATFORM_AUDIENCE"
+KCADM2
+  echo "✅ Platform seeded (PLATFORM=1)."
+fi

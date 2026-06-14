@@ -81,6 +81,27 @@ type Config struct {
 	// call the control-plane admin API via CORS (the admin console SPA). Empty
 	// disables CORS. A read-only/observability accommodation — no authz change.
 	ConsoleOrigins string
+
+	// --- Tenant provisioning (003-tenant-provisioning) ---
+	// The control plane uses a privileged Keycloak service-account credential to
+	// create realms/clients/roles/users via the Admin API. Its secret is resolved
+	// from the secret store via KeycloakAdminSecretRef — never read directly here.
+	KeycloakAdminURL       string // Keycloak base URL for the Admin API (e.g. http://localhost:8081)
+	KeycloakAdminClientID  string // privileged service-account client id
+	KeycloakAdminSecretRef string // secret-store ref holding {"secret": "..."}; never the value
+	KeycloakAdminSecret    string // DEV ONLY: direct secret (prod MUST use KeycloakAdminSecretRef -> Vault)
+	// Operator (platform) APIs authenticate against a dedicated platform realm,
+	// distinct from any tenant org — see authz.ValidateForRealm.
+	PlatformRealm    string // realm issuing operator tokens (default _platform)
+	PlatformAudience string // expected audience for platform-admin tokens
+	// TenantReservedSlugs is a CSV of slugs that may never be allocated to a tenant.
+	TenantReservedSlugs string
+	// AuditRetentionDays is the window a deleted tenant's WORM audit is retained
+	// before purge. MUST be >= 365 to satisfy Constitution VI.
+	AuditRetentionDays int
+	// TenantCeiling is the realm-count threshold beyond which provisioning warns
+	// (identity-platform performance) — SC-009.
+	TenantCeiling int
 }
 
 var (
@@ -127,6 +148,15 @@ func load() *Config {
 		BlockPrivateEgress:     getBool("MCP_BLOCK_PRIVATE_EGRESS", strings.EqualFold(env, "prod")),
 		AuditDenyPerMin:        getInt("MCP_AUDIT_DENY_PER_MIN", 600),
 		ConsoleOrigins:         getEnv("MCP_CONSOLE_ORIGINS", ""),
+		KeycloakAdminURL:       getEnv("MCP_KEYCLOAK_ADMIN_URL", "http://localhost:8081"),
+		KeycloakAdminClientID:  getEnv("MCP_KEYCLOAK_ADMIN_CLIENT_ID", ""),
+		KeycloakAdminSecretRef: getEnv("MCP_KEYCLOAK_ADMIN_SECRET_REF", ""),
+		KeycloakAdminSecret:    getEnv("MCP_KEYCLOAK_ADMIN_SECRET", ""),
+		PlatformRealm:          getEnv("MCP_PLATFORM_REALM", "_platform"),
+		PlatformAudience:       getEnv("MCP_PLATFORM_AUDIENCE", ""),
+		TenantReservedSlugs:    getEnv("MCP_TENANT_RESERVED_SLUGS", "www,api,admin,auth,app"),
+		AuditRetentionDays:     getInt("MCP_AUDIT_RETENTION_DAYS", 365),
+		TenantCeiling:          getInt("MCP_TENANT_CEILING", 200),
 	}
 }
 
