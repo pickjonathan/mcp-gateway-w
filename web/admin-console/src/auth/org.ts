@@ -68,8 +68,25 @@ export function clearDevOrg(): void {
   }
 }
 
-// needsDevOrgChoice is true when the picker should be shown: dev host, more than
-// one selectable org, and nothing chosen yet.
+// needsDevOrgChoice is true when the picker should run: a dev host with nothing
+// chosen yet. The picker fetches the live realm list and auto-selects when there
+// is only one, so this stays a cheap synchronous gate.
 export function needsDevOrgChoice(): boolean {
-  return isDevHost() && devOrgs().length > 1 && selectedDevOrg() === null
+  return isDevHost() && selectedDevOrg() === null
+}
+
+// fetchDevOrgs queries the control-plane's dev endpoint for the realms that exist
+// in Keycloak, so realms created by hand appear without editing env. Returns [] on
+// any failure — the picker then falls back to VITE_DEV_ORGS. Dev-only: the
+// endpoint 404s in prod, and prod never resolves the org via the picker anyway.
+export async function fetchDevOrgs(): Promise<string[]> {
+  try {
+    const base = import.meta.env.VITE_API_BASE ?? ''
+    const res = await fetch(`${base}/v1/dev/orgs`, { headers: { accept: 'application/json' } })
+    if (!res.ok) return []
+    const body = (await res.json()) as { orgs?: string[] }
+    return Array.isArray(body.orgs) ? body.orgs : []
+  } catch {
+    return []
+  }
 }
