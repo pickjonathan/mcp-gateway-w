@@ -9,11 +9,11 @@ A **presentation-only admin console SPA** (React + TypeScript + Vite; Carbon Des
 
 **Hard constraints (MUST, inherited)**: organization isolation, secret confidentiality (secrets are write-only — never displayed/copied/logged), frictionless admin. The console MUST NOT weaken these for UX (Constitution IV).
 
-### Planned: Automated Tenant Provisioning (`003-tenant-provisioning`)
+### Active: Automated Tenant Provisioning (`003-tenant-provisioning`)
 
-Plan: `specs/003-tenant-provisioning/plan.md` (see also `spec.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`). **Planned, not yet in implementation.**
+Docs: `docs/tenant-provisioning.md`. Spec/plan/tasks/contracts: `specs/003-tenant-provisioning/`. **US1–US4 implemented + tested (live-validated against the dev Keycloak); US5 (self-service signup) deferred.** Run: `make seed-platform`, then start the control-plane with `MCP_KEYCLOAK_ADMIN_CLIENT_ID=mcp-provisioner` + the printed `MCP_KEYCLOAK_ADMIN_SECRET` (+ `MCP_PLATFORM_REALM=_platform`), then `make provision-tenant SLUG=… NAME=… ADMIN_EMAIL=…`.
 
-A **control-plane capability to provision/populate/deprovision isolated tenants**. A tenant **is** a Keycloak realm; bootstrap (Half A) uses the **Keycloak Admin API** (programmatic `seed-keycloak.sh`), and user provisioning (Half B) ships **invites + OIDC/SAML brokering + SCIM** in v1. Operator-initiated (self-service signup deferred); realm-per-tenant (tens–low-hundreds); delete purges identity/creds/servers but **retains WORM audit ≥ 1y** (Constitution VI). New control-plane packages (`tenants`, `idp`, `invites`, `scimbridge`) + a **platform realm/`platform-admin`** authz + a privileged Keycloak service-account credential in Vault. **Gateway unchanged** (org still derived from Host + issuer; suspend = realm-disable).
+A **control-plane capability to provision/populate/deprovision isolated tenants**. A tenant **is** a Keycloak realm; bootstrap (Half A) uses the **Keycloak Admin API** (an in-house `net/http` client in `idp/`, the programmatic `seed-keycloak.sh`), and user provisioning (Half B) ships **invites + OIDC/SAML brokering + SCIM** in v1. Operator-initiated (self-service signup deferred); realm-per-tenant (tens–low-hundreds); delete purges identity/creds/servers (kill-switch via `serverevents`) but **retains WORM audit ≥ 1y** (Constitution VI). New control-plane packages (`tenants`, `idp`, `invites`, `brokering`, `scimbridge`) + a **platform realm/`platform-admin`** authz (`authz.ValidateForRealm`) + a privileged Keycloak service-account credential in Vault. **Gateway unchanged** (org still derived from Host + issuer; suspend = realm-disable).
 <!-- SPECKIT END -->
 
 ## Project overview

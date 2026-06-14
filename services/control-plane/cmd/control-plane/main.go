@@ -59,7 +59,8 @@ func main() {
 		auditLog = arch
 		log.Info().Str("bucket", cfg.AuditS3Bucket).Msg("using durable audit archive")
 	}
-	api := admin.NewAPI(cfg, log, store, admin.NewBusSink(bus), sec, auditLog, validator)
+	sink := admin.NewBusSink(bus)
+	api := admin.NewAPI(cfg, log, store, sink, sec, auditLog, validator)
 
 	// 003 tenant provisioning: platform-scoped tenant registry + operator API,
 	// mounted on the same server, authorized against the platform realm.
@@ -100,6 +101,7 @@ func main() {
 		AccessTTL:          900, SSOIdle: 28800, SSOMax: 86400,
 		SSLRequired: sslRequired(cfg),
 	})
+	tenantSvc.SetServerPurger(admin.NewOrgPurger(store, sink)) // kill-switch on delete (T041)
 	tenantHandlers := tenants.NewHandlers(tenantSvc, tenantStore)
 	api.Mount(func(e *echo.Echo) {
 		tenants.RegisterRoutes(e, tenantHandlers, validator, cfg.PlatformRealm, cfg.PlatformAudience)

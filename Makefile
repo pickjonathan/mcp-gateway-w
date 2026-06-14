@@ -1,4 +1,4 @@
-.PHONY: build run run-gateway run-control-plane test vet lint tidy docker dev-up dev-down seed-keycloak
+.PHONY: build run run-gateway run-control-plane test vet lint tidy docker dev-up dev-down seed-keycloak seed-platform provision-tenant
 BIN ?= bin/gateway
 
 # Dev env for running the Go services against the local compose stack: points at
@@ -50,3 +50,20 @@ dev-down:
 # Provision the dev Keycloak realm/client/user the admin console needs (idempotent).
 seed-keycloak:
 	@bash deploy/dev/seed-keycloak.sh
+
+# Seed the platform realm + provisioner service account (003, DEV — prints the
+# secret to export as MCP_KEYCLOAK_ADMIN_SECRET when running the control-plane).
+seed-platform:
+	@PLATFORM=1 bash deploy/dev/seed-keycloak.sh
+
+# Provision a tenant via the platform API (003). The control-plane must be running
+# with provisioning enabled and `make seed-platform` must have run. Usage:
+#   make provision-tenant SLUG=globex NAME='Globex' ADMIN_EMAIL=ops@globex.example
+provision-tenant:
+	@OP=$$(curl -s http://localhost:8081/realms/$${PLATFORM_REALM:-_platform}/protocol/openid-connect/token \
+	  -d grant_type=password -d client_id=mcp-platform -d username=$${OPERATOR:-operator} -d password=$${OPERATOR_PW:-operator} -d scope=openid \
+	  | python3 -c 'import sys,json;print(json.load(sys.stdin).get("access_token",""))'); \
+	[ -n "$$OP" ] || { echo "no operator token — run 'make seed-platform' and start the control-plane"; exit 1; }; \
+	curl -s -X POST http://localhost:8090/v1/platform/tenants -H "Authorization: Bearer $$OP" \
+	  -H 'Content-Type: application/json' \
+	  -d "{\"slug\":\"$(SLUG)\",\"display_name\":\"$(NAME)\",\"admin_email\":\"$(ADMIN_EMAIL)\"}"; echo

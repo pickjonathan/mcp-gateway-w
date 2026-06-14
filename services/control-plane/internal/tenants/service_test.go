@@ -140,3 +140,27 @@ func TestDelete_RetainsAuditOneYear(t *testing.T) {
 		t.Errorf("audit retention %v is < ~1 year after delete %v", tn.AuditRetentionUntil, tn.DeletedAt)
 	}
 }
+
+type fakePurger struct{ purged []string }
+
+func (f *fakePurger) PurgeOrg(_ context.Context, org string) (int, error) {
+	f.purged = append(f.purged, org)
+	return 1, nil
+}
+
+// Delete fires the kill-switch (purges the org's servers) before removing the realm.
+func TestDelete_FiresKillSwitch(t *testing.T) {
+	kc := newFakeKC()
+	svc, _ := newTestService(kc)
+	p := &fakePurger{}
+	svc.SetServerPurger(p)
+	if _, _, err := svc.Provision(context.Background(), ProvisionRequest{Slug: "tmp", AdminEmail: "a@b.c"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Delete(context.Background(), "tmp", "op"); err != nil {
+		t.Fatal(err)
+	}
+	if len(p.purged) != 1 || p.purged[0] != "tmp" {
+		t.Errorf("kill-switch not fired for the deleted tenant: %v", p.purged)
+	}
+}

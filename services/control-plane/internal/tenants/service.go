@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 
 	"github.com/acme-corp/mcp-runtime/pkg/audit"
 	"github.com/acme-corp/mcp-runtime/pkg/authz"
@@ -17,10 +20,21 @@ import (
 
 // ErrInvalidSlug / ErrConflict are returned for client errors (mapped to 422/409).
 var (
-	ErrInvalidSlug = errors.New("invalid tenant slug")
-	ErrConflict    = errors.New("tenant in a conflicting state")
+	ErrInvalidSlug   = errors.New("invalid tenant slug")
+	ErrConflict      = errors.New("tenant in a conflicting state")
 	ErrNotConfigured = errors.New("tenant provisioning not configured (no Keycloak admin client)")
 )
+
+// tenantOps counts tenant lifecycle operations by action and outcome (T025). The
+// global meter delegates to the real provider once telemetry sets it.
+var tenantOps, _ = otel.Meter("github.com/acme-corp/mcp-runtime/services/control-plane/internal/tenants").
+	Int64Counter("mcp_tenant_ops_total", metric.WithDescription("Tenant lifecycle operations by action and outcome"))
+
+// ServerPurger removes an org's downstream servers (kill-switch) during tenant
+// delete (T041); implemented by admin.OrgPurger. Optional.
+type ServerPurger interface {
+	PurgeOrg(ctx context.Context, org string) (int, error)
+}
 
 // Config holds non-secret provisioning settings (from pkg/config).
 type Config struct {
@@ -40,12 +54,21 @@ type Config struct {
 // Service orchestrates tenant lifecycle: provision (idempotent saga with
 // compensation), suspend/resume, and delete. Every action is audited.
 type Service struct {
-	store Store
-	kc    idp.Keycloak // nil when provisioning is not configured
-	audit audit.Logger
-	log   zerolog.Logger
-	cfg   Config
-	now   func() time.Time
+	store  Store
+	kc     idp.Keycloak // nil when provisioning is not configured
+	audit  audit.Logger
+	log    zerolog.Logger
+	cfg    Config
+	purger ServerPurger // optional; kill-switch on delete (T041)
+	now    func() time.Time
+}
+
+// SetServerPurger wires the kill-switch used during Delete (FR-021). Optional.
+func (s *Service) SetServerPurger(p ServerPurger) { s.purger = p }
+
+func (s *Service) metric(ctx context.Context, action, outcome string) {
+	tenantOps.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("action", action), attribute.String("outcome", outcome)))
 }
 
 // NewService builds the service. kc may be nil in environments where provisioning
@@ -164,6 +187,7 @@ func (s *Service) Provision(ctx context.Context, req ProvisionRequest) (Tenant, 
 		job.UpdatedAt = s.now()
 		_ = s.store.UpdateJob(ctx, job)
 		s.record(ctx, req.Slug, req.Actor, "tenant.provision.failed", runErr.Error())
+		s.metric(ctx, "provision", "failed")
 		return t, job, runErr
 	}
 	t.Status = StatusActive
@@ -174,6 +198,7 @@ func (s *Service) Provision(ctx context.Context, req ProvisionRequest) (Tenant, 
 	job.UpdatedAt = s.now()
 	_ = s.store.UpdateJob(ctx, job)
 	s.record(ctx, req.Slug, req.Actor, "tenant.provision.succeeded", "")
+	s.metric(ctx, "provision", "success")
 	return t, job, nil
 }
 
@@ -200,6 +225,7 @@ func (s *Service) Suspend(ctx context.Context, slug, actor string) (Tenant, erro
 		return Tenant{}, err
 	}
 	s.record(ctx, slug, actor, "tenant.suspend", "")
+	s.metric(ctx, "suspend", "success")
 	return t, nil
 }
 
@@ -226,6 +252,7 @@ func (s *Service) Resume(ctx context.Context, slug, actor string) (Tenant, error
 		return Tenant{}, err
 	}
 	s.record(ctx, slug, actor, "tenant.resume", "")
+	s.metric(ctx, "resume", "success")
 	return t, nil
 }
 
@@ -247,6 +274,13 @@ func (s *Service) Delete(ctx context.Context, slug, actor string) (Tenant, error
 	t.Status = StatusDeleting
 	t.UpdatedAt = now
 	_ = s.store.UpdateTenant(ctx, t)
+	// Kill-switch (FR-021): remove the org's servers so the gateway terminates
+	// running instances + revokes injected creds, before the realm is deleted.
+	if s.purger != nil {
+		if n, err := s.purger.PurgeOrg(ctx, slug); err == nil && n > 0 {
+			s.log.Info().Int("servers", n).Str("tenant", slug).Msg("purged org servers (kill-switch)")
+		}
+	}
 	if err := s.kc.DeleteRealm(ctx, slug); err != nil {
 		t.Status = StatusFailed
 		t.UpdatedAt = s.now()
@@ -265,6 +299,7 @@ func (s *Service) Delete(ctx context.Context, slug, actor string) (Tenant, error
 	t.UpdatedAt = now
 	_ = s.store.UpdateTenant(ctx, t)
 	s.record(ctx, slug, actor, "tenant.delete", "audit retained until "+ret.Format(time.RFC3339))
+	s.metric(ctx, "delete", "success")
 	return t, nil
 }
 
