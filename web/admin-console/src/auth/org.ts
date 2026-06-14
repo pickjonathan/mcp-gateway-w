@@ -41,12 +41,13 @@ export function devOrgs(): string[] {
   )
 }
 
-// selectedDevOrg returns the stored dev selection if it is still a known dev org,
-// else null.
+// selectedDevOrg returns the stored dev selection, if any. It is NOT validated
+// against the static VITE_DEV_ORGS list — the picker offers realms discovered live
+// from Keycloak (which need not be in env), and the realm is validated server-side
+// on the OIDC flow. A bogus value simply fails auth (recoverable via "Switch org").
 export function selectedDevOrg(): string | null {
   try {
-    const v = window.localStorage.getItem(DEV_ORG_KEY)
-    return v && devOrgs().includes(v) ? v : null
+    return window.localStorage.getItem(DEV_ORG_KEY) || null
   } catch {
     return null
   }
