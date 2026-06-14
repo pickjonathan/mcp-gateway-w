@@ -162,16 +162,11 @@ func (h *Handlers) scimAuth(next echo.HandlerFunc) echo.HandlerFunc {
 			return scimError(c, http.StatusServiceUnavailable, "provisioning not configured")
 		}
 		c.Set("scimOrg", org)
-		c.Set("scimConn", conn)
 		return next(c)
 	}
 }
 
-func scimOrg(c echo.Context) string  { s, _ := c.Get("scimOrg").(string); return s }
-func scimConn(c echo.Context) Connection {
-	conn, _ := c.Get("scimConn").(Connection)
-	return conn
-}
+func scimOrg(c echo.Context) string { s, _ := c.Get("scimOrg").(string); return s }
 
 // CreateUser provisions (or re-activates) a user in the bearer's realm and maps
 // group memberships to realm roles.
