@@ -18,6 +18,7 @@ import (
 	"github.com/acme-corp/mcp-runtime/pkg/serverevents"
 	"github.com/acme-corp/mcp-runtime/services/control-plane/internal/admin"
 	"github.com/acme-corp/mcp-runtime/services/control-plane/internal/brokering"
+	"github.com/acme-corp/mcp-runtime/services/control-plane/internal/devapi"
 	"github.com/acme-corp/mcp-runtime/services/control-plane/internal/idp"
 	"github.com/acme-corp/mcp-runtime/services/control-plane/internal/invites"
 	"github.com/acme-corp/mcp-runtime/services/control-plane/internal/scimbridge"
@@ -160,6 +161,18 @@ func main() {
 	api.Mount(func(e *echo.Echo) {
 		scimbridge.RegisterRoutes(e, scimHandlers, validator, cfg.AdminAudience)
 	})
+
+	// Dev-only org discovery for the console picker. NEVER in prod — enumerating
+	// realms would disclose tenants (HC-1).
+	if !cfg.IsProd() {
+		var lister idp.RealmLister
+		if rc, ok := kc.(*idp.RESTClient); ok {
+			lister = rc
+		}
+		devHandlers := devapi.NewHandlers(lister)
+		api.Mount(func(e *echo.Echo) { devapi.RegisterRoutes(e, devHandlers) })
+		log.Info().Msg("dev endpoints enabled (/v1/dev/orgs) — NON-PROD ONLY")
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

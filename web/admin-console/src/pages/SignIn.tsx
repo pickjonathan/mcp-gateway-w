@@ -2,10 +2,16 @@ import { Navigate } from 'react-router-dom'
 import { useSession } from '../auth/AuthProvider'
 import { Button } from '../design-system/components/core/Button'
 import { Tile } from '../design-system/components/core/Tile'
+import { clearDevOrg, isDevHost, resolveOrg } from '../auth/org'
 
 export function SignIn() {
   const { signIn, session, loading } = useSession()
   if (!loading && session) return <Navigate to="/" replace />
+  const dev = isDevHost()
+  const switchOrg = () => {
+    clearDevOrg()
+    window.location.reload()
+  }
   return (
     <main
       style={{
@@ -19,10 +25,24 @@ export function SignIn() {
         MCP Admin Console
       </h1>
       <Tile>
-        <p style={{ marginTop: 0 }}>Sign in with your organization administrator account.</p>
+        <p style={{ marginTop: 0 }}>
+          Sign in with your organization administrator account
+          {dev ? (
+            <>
+              {' '}
+              for <strong>{resolveOrg()}</strong>
+            </>
+          ) : null}
+          .
+        </p>
         <Button kind="primary" onClick={() => void signIn()}>
           Sign in
         </Button>
+        {dev && (
+          <Button kind="ghost" size="sm" onClick={switchOrg}>
+            Choose a different organization
+          </Button>
+        )}
       </Tile>
     </main>
   )
