@@ -110,8 +110,10 @@ Full docs live in [`docs/`](docs/) and render as a small site:
 | [Data Model](docs/data-model.md) | Entities & relationships |
 | [Local Dev & Runbook](docs/local-dev.md) | Stack, endpoints, integration tests |
 | [Local gVisor Sandbox](docs/local-sandbox.md) | The HC-3 boundary locally |
+| [Sandboxing & Isolation](docs/sandbox-isolation.md) | Runtimes (exec/runc/gVisor/Kata), Mac vs Docker-Linux, MCP + per-org AWS-MCP isolation |
 | [Multi-tenant (Keycloak)](docs/multi-tenant-keycloak.md) | Realm-per-org, onboarding, MCP scopes, roles, invites |
 | [MCP Clients & RBAC](docs/mcp-inspector-rbac.md) | Connect the Inspector/clients; validate per-user tool access |
+| [Isolation Proof](docs/isolation-proof.md) | Two-tenant AWS-MCP end-to-end isolation proof (gVisor, ministack, stress) |
 
 ### Viewing the docs site
 

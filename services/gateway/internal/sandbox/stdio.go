@@ -86,6 +86,7 @@ type Server struct {
 	inst   *Instance
 	c      *conn
 	inited bool
+	cancel context.CancelFunc // cancels the instance's lifetime context (see ensure)
 }
 
 // NewServer returns a stdio-backed downstream that launches spec via rt.
@@ -97,8 +98,14 @@ func (s *Server) ensure(ctx context.Context) error {
 	if s.inited {
 		return nil
 	}
-	inst, err := s.rt.Launch(ctx, s.spec)
+	// The sandbox instance is reused across requests, so it MUST outlive any single
+	// request. Launch it under a lifetime context (cancelled by Close), not the
+	// request ctx — otherwise the container is killed when the first request's
+	// context is cancelled, and the next call writes to a dead process (broken pipe).
+	runCtx, cancel := context.WithCancel(context.Background())
+	inst, err := s.rt.Launch(runCtx, s.spec)
 	if err != nil {
+		cancel()
 		return err
 	}
 	c := newConn(inst.Stdin, inst.Stdout)
@@ -107,10 +114,11 @@ func (s *Server) ensure(ctx context.Context) error {
 		clientProtocolVersion))
 	if _, err := c.call("initialize", initParams); err != nil {
 		_ = inst.Stop()
+		cancel()
 		return err
 	}
 	c.notify("notifications/initialized")
-	s.inst, s.c, s.inited = inst, c, true
+	s.inst, s.c, s.inited, s.cancel = inst, c, true, cancel
 	return nil
 }
 
@@ -148,6 +156,10 @@ func (s *Server) CallTool(ctx context.Context, name string, args json.RawMessage
 func (s *Server) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.cancel != nil {
+		s.cancel()
+		s.cancel = nil
+	}
 	if s.inst != nil {
 		err := s.inst.Stop()
 		s.inst, s.c, s.inited = nil, nil, false

@@ -44,6 +44,22 @@ added via the control plane launches as `docker run --runtime=runsc --network no
 --read-only --cap-drop ALL --pids-limit 256 ...` — real gVisor isolation plus
 default-deny egress and resource limits.
 
+## Sandbox egress allowlist (`MCP_SANDBOX_EGRESS_NETWORK`)
+
+By default a sandbox runs `--network none` (default-deny egress). To let it reach exactly
+one dependency — e.g. the local AWS emulator used by the
+[two-tenant isolation proof](isolation-proof.md) — set **`MCP_SANDBOX_EGRESS_NETWORK`** to
+a Docker network whose only members are the allowed targets:
+
+```bash
+MCP_SANDBOX_RUNTIME=gvisor MCP_SANDBOX_EGRESS_NETWORK=mcp-sandbox-egress make run
+```
+
+Make that network `internal: true` (no external route → no cloud metadata, no internet, no
+control plane). Empty (the default) keeps `--network none`, byte-for-byte unchanged. This is
+the explicit-allowlist half of default-deny egress: the sandbox can reach **only** that
+network's members. (`make run-gateway-proof` sets both vars for you.)
+
 ## Full microVM fidelity — Kata (nested virt)
 
 On this M4 (nested virt available), install Kata Containers in the Linux VM,

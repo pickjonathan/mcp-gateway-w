@@ -83,6 +83,11 @@ make test-security    # provisions org-A/org-B + 2 users each; runs hostile MCP 
 - A token with `aud` for org A replayed against org B's endpoint → rejected.
 - Disable a misbehaving server → stops serving within 5 s, other servers unaffected (SC-004).
 
+> **Deeper, real-workload gate**: the [Two-Tenant AWS-MCP Isolation Proof](../../docs/isolation-proof.md)
+> (`make prove-isolation`, spec `004-aws-mcp-isolation-proof`) exercises this same boundary end-to-end
+> with two tenants each running a credentialed stdio AWS MCP server under gVisor against a local
+> `ministack`, including a stress run and sandbox egress-containment checks. Run locally; CI wiring deferred.
+
 ## 7. Validation matrix
 
 | Spec item | Step |

@@ -50,6 +50,13 @@ type Config struct {
 	// SandboxImage is the base container image stdio servers run in (node/npx, python/uv).
 	SandboxImage string
 
+	// SandboxEgressNetwork is the Docker network a sandboxed stdio server joins for
+	// egress. Empty (default) keeps the default-deny `--network none`. When set, it
+	// is the *explicit allowlist* (Constitution II): the sandbox can reach only the
+	// members of that network (e.g. an `internal: true` network whose sole member is
+	// a local emulator) — never the control plane, cloud metadata, or the internet.
+	SandboxEgressNetwork string
+
 	// Per-minute request limits (0 = unlimited) — noisy-neighbor protection (FR-017).
 	RateOrgPerMin  int
 	RateUserPerMin int
@@ -136,6 +143,7 @@ func load() *Config {
 		ResourceTemplate:       getEnv("MCP_RESOURCE_TEMPLATE", ""),
 		SandboxRuntime:         getEnv("MCP_SANDBOX_RUNTIME", "gvisor"),
 		SandboxImage:           getEnv("MCP_SANDBOX_IMAGE", "acme/mcp-sandbox:dev"),
+		SandboxEgressNetwork:   getEnv("MCP_SANDBOX_EGRESS_NETWORK", ""),
 		RateOrgPerMin:          getInt("MCP_RATE_ORG_PER_MIN", 0),
 		RateUserPerMin:         getInt("MCP_RATE_USER_PER_MIN", 0),
 		OTLPEndpoint:           getEnv("MCP_OTLP_ENDPOINT", ""),

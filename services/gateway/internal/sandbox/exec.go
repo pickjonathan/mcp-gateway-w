@@ -49,15 +49,20 @@ func (ExecRuntime) Launch(ctx context.Context, spec Spec) (*Instance, error) {
 //
 // gVisor/Kata require a Docker daemon with that runtime registered — on macOS,
 // a Linux VM (see docs/local-sandbox.md). gVisor needs no nested virtualization.
-func Select(name, image string, log zerolog.Logger) Runtime {
+//
+// egressNetwork is the Docker network the container joins for egress. Empty keeps
+// the default-deny `--network none`; a non-empty value is the explicit allowlist
+// (Constitution II) — the sandbox can reach only that network's members. It is
+// ignored by the unsandboxed exec backend (which has no container network).
+func Select(name, image, egressNetwork string, log zerolog.Logger) Runtime {
 	switch name {
 	case "gvisor":
-		return ContainerRuntime{Image: image, OCIRuntime: "runsc"}
+		return ContainerRuntime{Image: image, OCIRuntime: "runsc", Network: egressNetwork}
 	case "kata":
-		return ContainerRuntime{Image: image, OCIRuntime: "kata"}
+		return ContainerRuntime{Image: image, OCIRuntime: "kata", Network: egressNetwork}
 	case "runc", "container":
 		log.Warn().Msg("plain container runtime is NOT an isolation boundary for untrusted code (HC-3)")
-		return ContainerRuntime{Image: image, OCIRuntime: "runc"}
+		return ContainerRuntime{Image: image, OCIRuntime: "runc", Network: egressNetwork}
 	case "exec", "":
 		log.Warn().Msg("using UNSANDBOXED exec runtime (dev only) — do NOT run untrusted code")
 		return ExecRuntime{}

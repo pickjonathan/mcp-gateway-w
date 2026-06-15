@@ -1,4 +1,4 @@
-.PHONY: build run run-gateway run-control-plane test vet lint tidy docker dev-up dev-down seed-keycloak seed-platform provision-tenant
+.PHONY: build run run-gateway run-control-plane test vet lint tidy docker dev-up dev-down seed-keycloak seed-platform provision-tenant sandbox-image run-gateway-proof prove-isolation
 BIN ?= bin/gateway
 
 # Dev env for running the Go services against the local compose stack: points at
@@ -67,3 +67,26 @@ provision-tenant:
 	curl -s -X POST http://localhost:8090/v1/platform/tenants -H "Authorization: Bearer $$OP" \
 	  -H 'Content-Type: application/json' \
 	  -d "{\"slug\":\"$(SLUG)\",\"display_name\":\"$(NAME)\",\"admin_email\":\"$(ADMIN_EMAIL)\"}"; echo
+
+# --- 004 Two-Tenant AWS-MCP Isolation Proof ----------------------------------
+# Build the sandbox image with the AWS MCP server + AWS CLI pre-baked (004).
+# Under gVisor/Lima this must build in the sandbox Docker daemon (set DOCKER_HOST
+# to the Lima VM, or run `bash .claude/skills/dev-setup/scripts/sandbox-up.sh`).
+sandbox-image:
+	docker build -t $${MCP_SANDBOX_IMAGE:-acme/mcp-sandbox:dev} deploy/sandbox-images
+
+# Run the gateway in PROOF mode: real gVisor sandbox + the emulator-only egress
+# allowlist. Requires a gVisor Docker daemon (Lima on macOS) and the
+# `mcp-sandbox-egress` network + ministack present in that daemon.
+run-gateway-proof:
+	$(DEV_ENV) MCP_HTTP_ADDR=:8080 MCP_SANDBOX_RUNTIME=gvisor \
+		MCP_SANDBOX_EGRESS_NETWORK=mcp-sandbox-egress \
+		MCP_RESOURCE_TEMPLATE='http://%s.mcp.example.com:8080/mcp' \
+		go run ./services/gateway/cmd/gateway
+
+# Run the end-to-end isolation proof harness (one command — FR-015/SC-001).
+# Prereqs: dev stack up, `make seed-platform`, gVisor gateway via `run-gateway-proof`,
+# ministack reachable. Pass flags via ARGS, e.g. ARGS="--keep --stress-seconds 60".
+prove-isolation:
+	@npm --prefix tests/isolation-proof install --no-audit --no-fund --silent
+	@npm --prefix tests/isolation-proof start -- $(ARGS)

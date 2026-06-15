@@ -25,8 +25,11 @@ Three independent layers, none trusted alone:
 
 stdio servers run arbitrary, possibly-hostile code, so they are confined:
 
-- **No network** (`--network none`) — cannot reach the cloud metadata endpoint,
-  internal services, other tenants, or the internet.
+- **No network** (`--network none`) by default — cannot reach the cloud metadata
+  endpoint, internal services, other tenants, or the internet. An optional explicit
+  **egress allowlist** (`MCP_SANDBOX_EGRESS_NETWORK` → a Docker `internal` network)
+  lets a sandbox reach *only* a named dependency (e.g. a local emulator) and nothing
+  else — the allowlist half of default-deny egress (HC-2).
 - **Dropped capabilities** (`--cap-drop ALL`, `no-new-privileges`).
 - **Read-only rootfs** + a small writable `tmpfs /tmp`.
 - **Resource limits** — CPU, memory, pids.
@@ -42,6 +45,12 @@ A live containment suite against the gVisor boundary confirmed:
 - read-only rootfs enforced; mount/capability escalation denied;
 - no host-filesystem leak;
 - egress to **metadata, internal, and internet** all blocked.
+
+The end-to-end [two-tenant AWS-MCP isolation proof](isolation-proof.md) re-verifies this
+boundary with a real workload (gVisor + per-tenant AWS credentials/buckets): it asserts a
+sandbox on the egress allowlist reaches *only* the emulator (control plane + metadata
+blocked), and that no tenant can reach another's server, credentials, or bucket — under
+stress, all fail closed and audited.
 
 ### Remote endpoint SSRF protection
 

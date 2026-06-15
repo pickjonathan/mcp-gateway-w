@@ -12,9 +12,11 @@
     { file: "data-model.md", title: "Data Model", html: "data-model.html" },
     { file: "local-dev.md", title: "Local Dev & Runbook", html: "local-dev.html" },
     { file: "local-sandbox.md", title: "Local gVisor Sandbox", html: "local-sandbox.html" },
+    { file: "sandbox-isolation.md", title: "Sandboxing & Isolation", html: "sandbox-isolation.html" },
     { file: "multi-tenant-keycloak.md", title: "Multi-tenant (Keycloak)", html: "multi-tenant-keycloak.html" },
     { file: "tenant-provisioning.md", title: "Tenant Provisioning", html: "tenant-provisioning.html" },
-    { file: "mcp-inspector-rbac.md", title: "MCP Clients & RBAC", html: "mcp-inspector-rbac.html" }
+    { file: "mcp-inspector-rbac.md", title: "MCP Clients & RBAC", html: "mcp-inspector-rbac.html" },
+    { file: "isolation-proof.md", title: "Isolation Proof", html: "isolation-proof.html" }
   ];
   var current = document.body.dataset.doc || "README.md";
 

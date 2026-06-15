@@ -60,7 +60,7 @@ func New(cfg *config.Config, log zerolog.Logger) *Server {
 	s := &Server{
 		e: e, cfg: cfg, log: log,
 		catalog:     cat,
-		runtime:     sandbox.Select(cfg.SandboxRuntime, cfg.SandboxImage, log),
+		runtime:     sandbox.Select(cfg.SandboxRuntime, cfg.SandboxImage, cfg.SandboxEgressNetwork, log),
 		secrets:     sec,
 		audit:       buildAuditLogger(cfg, log),
 		redis:       rdb,
@@ -135,7 +135,7 @@ func (s *Server) handleMCP(c echo.Context) error {
 	}
 	p, _ := c.Get("principal").(*authz.Principal)
 	resp := s.handler.Dispatch(c.Request().Context(), p, &req)
-	s.observeToolCall(c.Request().Context(), &req, resp)
+	s.observeToolCall(c.Request().Context(), p, &req, resp)
 	if resp == nil { // notification — no reply expected
 		return c.NoContent(http.StatusAccepted)
 	}

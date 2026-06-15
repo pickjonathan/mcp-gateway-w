@@ -37,6 +37,18 @@ services:
       MINIO_ROOT_PASSWORD: minioadmin
     ports: ["9000:9000", "9001:9001"]
 
+  # Local AWS emulator for the isolation proof (004). ONE ministack hosting TWO
+  # accounts: each realm's AWS MCP authenticates with its own 12-digit access key =
+  # its own AWS account, and ministack namespaces (and access-controls) resources
+  # per account. "Correct MCP → correct account" is validated from ministack's own
+  # per-account state. On the default network (harness reaches it on :4566) AND the
+  # internal egress network the sandboxed AWS MCP servers join (reach it by name).
+  ministack:
+    image: ministackorg/ministack:latest
+    environment: { GATEWAY_PORT: "4566", SERVICES: "s3,iam,sts", LOG_LEVEL: "DEBUG" }
+    ports: ["4566:4566"]
+    networks: { default: {}, mcp-sandbox-egress: {} }
+
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     command: ["start-dev"]
@@ -113,3 +125,16 @@ services:
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     ports: ["16686:16686", "4318:4318"]
+
+# Sandboxed stdio MCP servers join this network for egress (004 isolation proof).
+# `internal: true` = no external route (no cloud metadata 169.254.169.254, no
+# internet); its only member is the emulator, so a sandbox can reach ONLY the
+# emulator — the explicit allowlist half of Constitution II. `name:` is pinned (not
+# project-prefixed) so the gateway's MCP_SANDBOX_EGRESS_NETWORK matches and ad-hoc
+# `docker run --network mcp-sandbox-egress` sandboxes attach to it.
+# NOTE (research.md D4): under gVisor/Lima the sandboxes run in the Lima VM's Docker
+# daemon — ministack and this network must exist THERE (see quickstart.md).
+networks:
+  mcp-sandbox-egress:
+    name: mcp-sandbox-egress
+    internal: true
