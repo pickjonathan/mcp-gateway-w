@@ -1,15 +1,23 @@
-// Central configuration for the isolation proof. All values overridable via env
-// so the harness runs against any environment; deterministic by default (SC-009).
+// Central configuration for the isolation proof. All values overridable via env.
+// Model: ONE ministack hosting TWO AWS accounts (one per realm). Each realm has a
+// dedicated user with a role that permits the realm's AWS MCP. We prove each
+// realm's user is routed to its own MCP → its own AWS account.
 
 export interface TenantCfg {
   slug: string;
   displayName: string;
+  // Admin identity (control-plane: register server, set creds, query audit).
   adminEmail: string;
-  accountId: string; // 12-digit AWS account id == AWS_ACCESS_KEY_ID (ministack, research.md D1)
+  adminPassword: string;
+  // This realm's AWS account on the shared ministack (12-digit key = account id).
+  accountId: string;
   secretAccessKey: string;
-  bucket: string;
-  user: string; // realm user the harness authenticates as (admin role)
-  password: string; // known password the harness sets via the Keycloak Admin API
+  bucket: string; // this realm's bucket, created under its account
+  marker: string; // unique object key this realm's MCP writes (proof of routing)
+  // Dedicated data-plane user + the role that grants access to the AWS MCP.
+  role: string;
+  user: string;
+  password: string;
 }
 
 export function env(k: string, def = ""): string {
@@ -19,8 +27,10 @@ export function env(k: string, def = ""): string {
 export const CONFIG = {
   controlPlane: env("MCP_PROOF_CONTROL_PLANE", "http://localhost:8090"),
   keycloak: env("MCP_PROOF_KEYCLOAK", "http://localhost:8081"),
-  awsEndpoint: env("MCP_PROOF_AWS_ENDPOINT", "http://localhost:4566"), // harness/host view
+  prometheus: env("MCP_PROOF_PROMETHEUS", "http://localhost:9090"),
+  awsEndpointHost: env("MCP_PROOF_AWS_ENDPOINT", "http://localhost:4566"), // harness view
   awsEndpointInternal: env("MCP_PROOF_AWS_ENDPOINT_INTERNAL", "http://ministack:4566"), // sandbox view
+  ministackContainer: env("MCP_PROOF_MINISTACK_CONTAINER", "mcp-runtime-dev-ministack-1"),
   baseDomain: env("MCP_PROOF_BASE_DOMAIN", "mcp.example.com"),
   gatewayPort: env("MCP_PROOF_GATEWAY_PORT", "8080"),
   region: env("MCP_PROOF_AWS_REGION", "us-east-1"),
@@ -31,7 +41,6 @@ export const CONFIG = {
     user: env("MCP_PROOF_OPERATOR", "operator"),
     password: env("MCP_PROOF_OPERATOR_PW", "operator"),
   },
-  // Keycloak Admin API access (to set known test-user passwords/roles per realm).
   kcAdmin: {
     realm: env("MCP_PROOF_KC_ADMIN_REALM", "master"),
     clientId: env("MCP_KEYCLOAK_ADMIN_CLIENT_ID", "mcp-provisioner"),
@@ -41,9 +50,8 @@ export const CONFIG = {
   },
   dataPlaneClient: env("MCP_PROOF_MCP_CLIENT", "mcp-client"),
   adminClient: env("MCP_PROOF_ADMIN_CLIENT", "mcp-admin-console"),
-  // The console-script command the pre-baked AWS MCP server is launched as
-  // (deploy/sandbox-images/Dockerfile).
   awsServerCommand: env("MCP_PROOF_AWS_MCP_COMMAND", "awslabs.aws-api-mcp-server"),
+  mcpRole: env("MCP_PROOF_ROLE", "mcp-user"),
   rateOrgPerMin: Number(env("MCP_PROOF_RATE_ORG_PER_MIN", "120")),
 };
 
@@ -57,12 +65,15 @@ export function tenants(slugsCsv = "alpha,beta"): TenantCfg[] {
     slug,
     displayName: slug.charAt(0).toUpperCase() + slug.slice(1),
     adminEmail: `admin@${slug}.example`,
-    // deterministic single-digit-repeat account id: alpha->111111111111, beta->222222222222
+    adminPassword: env(`MCP_PROOF_${slug.toUpperCase()}_ADMIN_PW`, `Proof-${slug}-admin-1!`),
+    // distinct AWS account per realm: alpha->111111111111, beta->222222222222
     accountId: String((i + 1) % 10).repeat(12),
     secretAccessKey: `proof-secret-${slug}`,
     bucket: `${slug}-data`,
-    user: env(`MCP_PROOF_${slug.toUpperCase()}_USER`, `admin@${slug}.example`),
-    password: env(`MCP_PROOF_${slug.toUpperCase()}_PW`, `Proof-${slug}-123!`),
+    marker: `proof/${slug}-via-gateway.txt`,
+    role: CONFIG.mcpRole,
+    user: env(`MCP_PROOF_${slug.toUpperCase()}_USER`, `${slug}-user`),
+    password: env(`MCP_PROOF_${slug.toUpperCase()}_PW`, `Proof-${slug}-user-1!`),
   }));
 }
 

@@ -8,6 +8,7 @@ import { setupTenant, TenantState } from "./lib/setup.js";
 import { teardownTenant, verifyClean } from "./lib/teardown.js";
 import { runPreflights } from "./lib/preflight.js";
 import { runUS1 } from "./lib/checks/us1.js";
+import { runRouting } from "./lib/checks/routing.js";
 import { runUS2 } from "./lib/checks/us2.js";
 import { runEgress } from "./lib/checks/egress.js";
 import { runUS3, runQuotaIndependence } from "./lib/checks/us3.js";
@@ -32,7 +33,7 @@ async function main(): Promise<void> {
   const report = new Report();
   report.environment = {
     sandbox_runtime: process.env.MCP_SANDBOX_RUNTIME || "gvisor",
-    aws_endpoint: CONFIG.awsEndpoint,
+    aws_endpoint: CONFIG.awsEndpointHost,
     tenants: ten.map((t) => t.slug),
     egress_network: process.env.MCP_SANDBOX_EGRESS_NETWORK || "mcp-sandbox-egress",
   };
@@ -51,7 +52,8 @@ async function main(): Promise<void> {
     for (const t of ten) states.push(await setupTenant(t));
 
     // proofs
-    await runUS1(report, states);
+    await runUS1(report, states); // each realm's roled user uses its own MCP (writes a marker)
+    await runRouting(report, states); // routed to correct MCP → correct account (server-side validated)
     await runUS2(report, states);
     await runEgress(report);
     if (!flags.noStress) {

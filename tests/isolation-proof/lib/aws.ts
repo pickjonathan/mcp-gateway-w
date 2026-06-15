@@ -1,10 +1,12 @@
-// S3 operations against the emulator with explicit per-account credentials.
+// S3 operations against the shared ministack with explicit per-account credentials.
+// Used both to seed buckets and to VALIDATE per-account state server-side (which
+// account a given MCP actually wrote to).
 import {
   S3Client,
   CreateBucketCommand,
   DeleteBucketCommand,
-  PutObjectCommand,
-  GetObjectCommand,
+  HeadObjectCommand,
+  ListBucketsCommand,
   ListObjectsV2Command,
   HeadBucketCommand,
 } from "@aws-sdk/client-s3";
@@ -13,7 +15,7 @@ import { CONFIG, TenantCfg } from "./config.js";
 export function s3For(accessKeyId: string, secretAccessKey: string): S3Client {
   return new S3Client({
     region: CONFIG.region,
-    endpoint: CONFIG.awsEndpoint,
+    endpoint: CONFIG.awsEndpointHost,
     forcePathStyle: true,
     credentials: { accessKeyId, secretAccessKey },
   });
@@ -36,17 +38,10 @@ export async function deleteBucketBestEffort(t: TenantCfg): Promise<void> {
   }
 }
 
-export async function putObject(t: TenantCfg, key: string, body: string): Promise<void> {
-  await s3For(t.accountId, t.secretAccessKey).send(
-    new PutObjectCommand({ Bucket: t.bucket, Key: key, Body: body }),
-  );
-}
-
-export async function getObject(t: TenantCfg, key: string): Promise<string> {
-  const r = await s3For(t.accountId, t.secretAccessKey).send(
-    new GetObjectCommand({ Bucket: t.bucket, Key: key }),
-  );
-  return await (r.Body as any).transformToString();
+/** Bucket names visible to an account (its namespace) — server-side attribution. */
+export async function listBuckets(accessKeyId: string, secret: string): Promise<string[]> {
+  const r = await s3For(accessKeyId, secret).send(new ListBucketsCommand({}));
+  return (r.Buckets || []).map((b) => b.Name as string);
 }
 
 export async function listObjects(accessKeyId: string, secret: string, bucket: string): Promise<string[]> {
@@ -54,7 +49,17 @@ export async function listObjects(accessKeyId: string, secret: string, bucket: s
   return (r.Contents || []).map((o) => o.Key as string);
 }
 
-/** True iff `bucket` is reachable with the given credentials (preflight + V4). */
+/** True iff `key` exists in `bucket` for the given account (marker validation). */
+export async function objectExists(accessKeyId: string, secret: string, bucket: string, key: string): Promise<boolean> {
+  try {
+    await s3For(accessKeyId, secret).send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** True iff `bucket` is reachable with the given credentials (preflight). */
 export async function bucketAccessible(accessKeyId: string, secret: string, bucket: string): Promise<boolean> {
   try {
     await s3For(accessKeyId, secret).send(new HeadBucketCommand({ Bucket: bucket }));

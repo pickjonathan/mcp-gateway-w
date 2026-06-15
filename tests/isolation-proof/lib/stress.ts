@@ -4,6 +4,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { TenantCfg, mcpUrl } from "./config.js";
 import { StressTenant } from "./report.js";
+import { sleep } from "./http.js";
+import { findTool } from "./mcp.js";
 
 async function connect(url: string, token: string): Promise<Client> {
   const transport = new StreamableHTTPClientTransport(new URL(url), {
@@ -45,10 +47,18 @@ export async function stressTenant(
       errorsNonQuota++;
       return;
     }
+    // Discover the aggregated tool name (e.g. aws__call_aws) — not the bare "call_aws".
+    let callName = "aws__call_aws";
+    try {
+      const lt: any = await client.listTools();
+      callName = findTool(lt.tools || [], "call_aws") || callName;
+    } catch {
+      /* keep default */
+    }
     while (Date.now() < deadline) {
       const t0 = Date.now();
       try {
-        const res: any = await client.callTool({ name: "call_aws", arguments: { cli_command: `aws s3 ls s3://${t.bucket}/` } });
+        const res: any = await client.callTool({ name: callName, arguments: { cli_command: `aws s3 ls s3://${t.bucket}/` } });
         calls++;
         latencies.push(Date.now() - t0);
         hooks.onResponse?.(t.slug, JSON.stringify(res));
@@ -57,6 +67,9 @@ export async function stressTenant(
         if (isQuota(e)) quota++;
         else errorsNonQuota++;
       }
+      // Pace the load (realistic smoke, ~5 req/s/worker) — without this the driver
+      // spins on instant rate-limit rejections and floods the window.
+      await sleep(180);
     }
     try {
       await client.close();
@@ -91,15 +104,27 @@ export async function burstCalls(t: TenantCfg, token: string, n: number): Promis
   } catch (e: any) {
     return { ok: 0, quota: 0, err: n };
   }
-  for (let i = 0; i < n; i++) {
-    try {
-      await client.callTool({ name: "call_aws", arguments: { cli_command: `aws s3 ls s3://${t.bucket}/` } });
-      ok++;
-    } catch (e: any) {
-      if (isQuota(e)) quota++;
-      else err++;
-    }
+  let callName = "aws__call_aws";
+  try {
+    const lt: any = await client.listTools();
+    callName = findTool(lt.tools || [], "call_aws") || callName;
+  } catch {
+    /* keep default */
   }
+  // Fire concurrently so the per-minute quota is exceeded quickly.
+  await Promise.all(
+    Array.from({ length: n }, () =>
+      client
+        .callTool({ name: callName, arguments: { cli_command: `aws s3 ls s3://${t.bucket}/` } })
+        .then(() => {
+          ok++;
+        })
+        .catch((e: any) => {
+          if (isQuota(e)) quota++;
+          else err++;
+        }),
+    ),
+  );
   try {
     await client.close();
   } catch {

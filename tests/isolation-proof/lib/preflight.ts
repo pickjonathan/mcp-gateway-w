@@ -21,7 +21,7 @@ export async function runPreflights(report: Report, ten: TenantCfg[]): Promise<b
     if (e?.$metadata?.httpStatusCode) {
       endpointOk = true;
     } else {
-      detail = `cannot reach emulator at ${CONFIG.awsEndpoint}: ${String(e?.name || e?.message || e)}`;
+      detail = `cannot reach emulator at ${CONFIG.awsEndpointHost}: ${String(e?.name || e?.message || e)}`;
     }
   }
   report.addPreflight({ id: "PF1", ref: ["FR-001"], story: "preflight", name: "endpoint_override (emulator reachable)", passed: endpointOk, detail });

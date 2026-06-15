@@ -25,7 +25,7 @@ export function operatorToken(): Promise<string> {
   });
 }
 
-/** Data-plane user token (audience = the tenant's MCP resource) via mcp-client. */
+/** Data-plane token for the DEDICATED roled user (audience = tenant MCP resource). */
 export function userToken(t: TenantCfg): Promise<string> {
   return oidcToken(t.slug, {
     grant_type: "password",
@@ -36,13 +36,13 @@ export function userToken(t: TenantCfg): Promise<string> {
   });
 }
 
-/** Admin-API token (audience = MCP_ADMIN_AUDIENCE) via the console client. */
+/** Admin-API token (audience = MCP_ADMIN_AUDIENCE) for the provisioned admin user. */
 export function adminToken(t: TenantCfg): Promise<string> {
   return oidcToken(t.slug, {
     grant_type: "password",
     client_id: CONFIG.adminClient,
-    username: t.user,
-    password: t.password,
+    username: t.adminEmail,
+    password: t.adminPassword,
     scope: "openid",
   });
 }

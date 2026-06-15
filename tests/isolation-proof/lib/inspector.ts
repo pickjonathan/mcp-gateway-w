@@ -13,7 +13,7 @@ function run(args: string[], timeoutMs = 60000): Promise<InspectorResult> {
   return new Promise((resolve) => {
     execFile(
       "npx",
-      ["--yes", "@modelcontextprotocol/inspector", "--cli", ...args],
+      ["--yes", "@modelcontextprotocol/inspector", "--cli", ...args],   // NB: this inspector version auto-detects URL transport; no --transport flag
       { timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024 },
       (err: any, stdout, stderr) => {
         let json: any;
@@ -37,7 +37,7 @@ function run(args: string[], timeoutMs = 60000): Promise<InspectorResult> {
 const authHeader = (token: string) => `Authorization: Bearer ${token}`;
 
 export function toolsList(url: string, token: string): Promise<InspectorResult> {
-  return run([url, "--transport", "http", "--header", authHeader(token), "--method", "tools/list"]);
+  return run([url, "--header", authHeader(token), "--method", "tools/list"]);
 }
 
 export function toolsCall(
@@ -46,7 +46,7 @@ export function toolsCall(
   tool: string,
   args: Record<string, string>,
 ): Promise<InspectorResult> {
-  const a = [url, "--transport", "http", "--header", authHeader(token), "--method", "tools/call", "--tool-name", tool];
+  const a = [url, "--header", authHeader(token), "--method", "tools/call", "--tool-name", tool];
   for (const [k, v] of Object.entries(args)) a.push("--tool-arg", `${k}=${v}`);
   return run(a);
 }

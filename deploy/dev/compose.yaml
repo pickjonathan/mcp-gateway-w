@@ -37,20 +37,17 @@ services:
       MINIO_ROOT_PASSWORD: minioadmin
     ports: ["9000:9000", "9001:9001"]
 
-  # Local AWS emulator for the tenant-isolation proof (004). S3 on :4566.
-  # Isolation is by per-account namespacing: a 12-digit AWS_ACCESS_KEY_ID = account id
-  # (see specs/004-aws-mcp-isolation-proof/research.md D1). Attached to the default
-  # network (harness/control-plane reach it by name + on :4566) AND the internal
-  # egress network the sandboxed AWS MCP servers join.
+  # Local AWS emulator for the isolation proof (004). ONE ministack hosting TWO
+  # accounts: each realm's AWS MCP authenticates with its own 12-digit access key =
+  # its own AWS account, and ministack namespaces (and access-controls) resources
+  # per account. "Correct MCP → correct account" is validated from ministack's own
+  # per-account state. On the default network (harness reaches it on :4566) AND the
+  # internal egress network the sandboxed AWS MCP servers join (reach it by name).
   ministack:
     image: ministackorg/ministack:latest
-    environment:
-      GATEWAY_PORT: "4566"
-      SERVICES: "s3,iam,sts"
+    environment: { GATEWAY_PORT: "4566", SERVICES: "s3,iam,sts", LOG_LEVEL: "DEBUG" }
     ports: ["4566:4566"]
-    networks:
-      default: {}
-      mcp-sandbox-egress: {}
+    networks: { default: {}, mcp-sandbox-egress: {} }
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
