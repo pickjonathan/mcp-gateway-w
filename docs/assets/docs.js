@@ -33,6 +33,32 @@
     '</ul><div class="foot">Multi-Tenant MCP Gateway Runtime</div>';
 
   var content = document.getElementById("content");
+
+  // Lazy-load Mermaid (only when a doc has ```mermaid blocks) and render them as
+  // diagrams. marked renders fenced ```mermaid as <pre><code class=language-mermaid>.
+  function loadMermaid(cb) {
+    if (window.mermaid) return cb(window.mermaid);
+    var s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js";
+    s.onload = function () { cb(window.mermaid); };
+    document.head.appendChild(s);
+  }
+  function renderMermaid() {
+    var blocks = content.querySelectorAll("pre > code.language-mermaid");
+    if (!blocks.length) return;
+    blocks.forEach(function (code) {
+      var div = document.createElement("div");
+      div.className = "mermaid";
+      div.textContent = code.textContent;
+      code.parentNode.replaceWith(div);
+    });
+    var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    loadMermaid(function (m) {
+      m.initialize({ startOnLoad: false, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
+      m.run({ querySelector: ".mermaid" });
+    });
+  }
+
   fetch(current)
     .then(function (r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
@@ -44,6 +70,7 @@
       content.querySelectorAll('a[href$=".md"], a[href*=".md#"]').forEach(function (a) {
         a.setAttribute("href", htmlFor(a.getAttribute("href")));
       });
+      renderMermaid();
       var meta = NAV.filter(function (n) { return n.file === current; })[0];
       document.title = (meta ? meta.title : "Docs") + " · MCP Runtime";
     })
